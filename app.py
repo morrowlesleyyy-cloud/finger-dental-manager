@@ -93,9 +93,7 @@ def sse_broadcast(event, data):
     for q in dead:
         sse_clients.remove(q)
 
-# =================== 创建表 ===================
-with app.app_context():
-    db.create_all()
+# =================== 创建表 (auto-import handles this) ===================
 
 # =================== Auth Routes ===================
 
@@ -175,8 +173,14 @@ def api_list_employees():
     err = require_admin()
     if err:
         return err
-    employees = Employee.query.order_by(Employee.id).all()
-    return jsonify({'data': [e.to_dict() for e in employees]})
+    try:
+        employees = Employee.query.order_by(Employee.id).all()
+        return jsonify({'data': [e.to_dict() for e in employees]})
+    except Exception as e:
+        # Table might not exist yet, create it
+        db.create_all()
+        employees = Employee.query.order_by(Employee.id).all()
+        return jsonify({'data': [e.to_dict() for e in employees]})
 
 
 @app.route('/api/employees', methods=['POST'])
@@ -1129,6 +1133,7 @@ def _parse_int(s):
 
 # Auto-import on first run (runs at module load time for both dev and gunicorn)
 with app.app_context():
+    db.create_all()  # Ensure all tables exist
     if Patient.query.count() == 0:
         print('📥 Database empty, importing data from Excel...')
         try:
