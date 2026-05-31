@@ -458,9 +458,9 @@ def appointments_page():
 
 @app.route('/api/appointments')
 def api_appointments():
-    err = require_permission('can_view_appointments')
-    if err:
-        return err
+    perms = flask_session.get('permissions', {})
+    if not perms.get('is_admin') and not perms.get('can_view_appointments'):
+        return jsonify({'error': 'forbidden', 'message': '权限不足'}), 403
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     status = request.args.get('status', '')
@@ -611,9 +611,9 @@ def transactions_page():
 
 @app.route('/api/transactions')
 def api_transactions():
-    err = require_permission('can_view_transactions')
-    if err:
-        return err
+    perms = flask_session.get('permissions', {})
+    if not perms.get('is_admin') and not perms.get('can_view_transactions'):
+        return jsonify({'error': 'forbidden', 'message': '权限不足'}), 403
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     search = request.args.get('search', '').strip()
@@ -749,9 +749,9 @@ def reports_page():
 
 @app.route('/api/reports/overview')
 def api_reports_overview():
-    err = require_permission('can_view_transactions')
-    if err:
-        return err
+    perms = flask_session.get('permissions', {})
+    if not perms.get('is_admin') and not perms.get('can_view_transactions'):
+        return jsonify({'error': 'forbidden', 'message': '权限不足'}), 403
     year = request.args.get('year', date.today().year, type=int)
 
     # 月度业绩
