@@ -293,6 +293,7 @@ function saveForm() {
     if (type === 'patient') savePatientForm();
     else if (type === 'appointment') saveAppointmentForm();
     else if (type === 'transaction') saveTransactionForm();
+    else if (type === 'employee') saveEmployeeForm();
     else showToast('未知表单类型', 'error');
 }
 
