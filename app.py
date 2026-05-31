@@ -68,7 +68,7 @@ def no_cache(response):
 
 
 # Global auth check - protect all routes except login and static
-PUBLIC_PATHS = ['/login', '/api/login', '/api/logout', '/static/', '/api/auth/check']
+PUBLIC_PATHS = ['/login', '/api/login', '/api/logout', '/static/', '/api/auth/check', '/api/health', '/health']
 
 @app.before_request
 def check_global_auth():
