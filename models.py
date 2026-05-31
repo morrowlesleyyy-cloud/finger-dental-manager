@@ -29,10 +29,13 @@ class Patient(db.Model):
                                    cascade='all, delete-orphan')
 
     def to_dict(self):
+        phone = self.phone or ''
+        if phone and not phone.startswith('60'):
+            phone = '60' + phone
         return {
             'id': self.id,
             'name': self.name,
-            'phone': self.phone,
+            'phone': phone,
             'gender': self.gender,
             'age': self.age,
             'tooth_count': self.tooth_count,
