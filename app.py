@@ -50,6 +50,13 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def normalize_phone(phone):
+    """Ensure phone starts with '60' (Malaysia country code)."""
+    if phone and not phone.startswith('60'):
+        return '60' + phone
+    return phone
+
+
 def no_cache(response):
     """Add headers to prevent caching of protected pages."""
     if isinstance(response, str):
@@ -409,7 +416,7 @@ def api_create_patient():
     data = request.get_json()
     p = Patient(
         name=data.get('name', ''),
-        phone=data.get('phone', ''),
+        phone=normalize_phone(data.get('phone', '')),
         gender=data.get('gender', ''),
         age=data.get('age', 0, type=int),
         tooth_count=data.get('tooth_count', ''),
@@ -553,7 +560,7 @@ def api_create_appointment():
         scheduled_time=data.get('scheduled_time', ''),
         inviter=data.get('inviter', ''),
         inviter_2=data.get('inviter_2', ''),
-        phone=data.get('phone', ''),
+        phone=normalize_phone(data.get('phone', '')),
         visit_type=data.get('visit_type', ''),
         actual_visit=data.get('actual_visit', ''),
         consultation_notes=data.get('consultation_notes', ''),
@@ -664,7 +671,7 @@ def api_create_transaction():
         if name:
             patient = Patient.query.filter_by(name=name).first()
             if not patient:
-                patient = Patient(name=name, phone=data.get('phone', ''))
+                patient = Patient(name=name, phone=normalize_phone(data.get('phone', '')))
                 db.session.add(patient)
                 db.session.flush()
             patient_id = patient.id
