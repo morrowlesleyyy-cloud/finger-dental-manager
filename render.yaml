@@ -1,17 +1,14 @@
-# Render Blueprint
 services:
   - type: web
     name: finger-dental-manager
-    runtime: python
+    runtime: docker
     region: singapore
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:10000 --workers 1 --threads 2 --timeout 120 --graceful-timeout 30
-    healthCheckPath: /api/health
+    dockerfilePath: ./Dockerfile
     envVars:
-      - key: RENDER
-        value: "true"
       - key: PORT
         value: "10000"
+      - key: RENDER
+        value: "true"
       - key: SECRET_KEY
         generateValue: true
