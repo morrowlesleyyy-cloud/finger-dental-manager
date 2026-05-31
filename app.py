@@ -5,7 +5,8 @@ import json
 import uuid
 from datetime import datetime, date, timedelta
 from flask import (Flask, render_template, request, jsonify, redirect,
-                   url_for, flash, Response, send_from_directory, session as flask_session)
+                   url_for, flash, Response, send_from_directory, session as flask_session,
+                   make_response)
 from sqlalchemy import func, extract, or_
 from functools import wraps
 
@@ -47,6 +48,8 @@ def login_required(f):
 
 def no_cache(response):
     """Add headers to prevent caching of protected pages."""
+    if isinstance(response, str):
+        response = make_response(response)
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
