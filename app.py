@@ -1136,6 +1136,101 @@ def _import_performance_row(row):
     db.session.add(t)
 
 
+# =================== Lazy Initialization ===================
+# Instead of running at module load (which blocks gunicorn startup),
+# we initialize on the first request. This eliminates 502 errors.
+
+_app_initialized = False
+_init_error = None
+
+def ensure_initialized():
+    """Run once on first request. Creates tables + imports data if needed."""
+    global _app_initialized, _init_error
+    if _app_initialized:
+        return True
+    
+    try:
+        # Enable WAL mode for SQLite
+        from sqlalchemy import text as sa_text
+        db.session.execute(sa_text('PRAGMA journal_mode=WAL'))
+        db.session.execute(sa_text('PRAGMA synchronous=NORMAL'))
+        db.session.commit()
+        
+        # Create employees table if not exists
+        try:
+            db.session.execute(sa_text('''
+                CREATE TABLE IF NOT EXISTS employees (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username VARCHAR(50) NOT NULL UNIQUE,
+                    password VARCHAR(200) NOT NULL,
+                    display_name VARCHAR(50) DEFAULT '',
+                    role VARCHAR(20) DEFAULT 'staff',
+                    can_view_appointments BOOLEAN DEFAULT 1,
+                    can_view_transactions BOOLEAN DEFAULT 1,
+                    can_edit_patients BOOLEAN DEFAULT 1,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at TIMESTAMP,
+                    updated_at TIMESTAMP
+                )
+            '''))
+            db.session.commit()
+        except:
+            pass
+        
+        db.create_all()
+        
+        # Import data if empty
+        if Patient.query.count() == 0:
+            print('📥 Auto-importing Excel data...')
+            import import_data
+            import_data.import_from_files(app)
+            print(f'✅ Imported {Patient.query.count()} patients')
+        
+        _app_initialized = True
+        _init_error = None
+        return True
+    except Exception as e:
+        import traceback
+        _init_error = str(e)
+        print(f'⚠️ Init failed: {e}')
+        traceback.print_exc()
+        return False
+
+
+@app.before_request
+def check_initialized():
+    """Ensure app is initialized before handling any request."""
+    if request.path in ['/api/health', '/health']:
+        return None  # Health check doesn't need init
+    if request.path.startswith('/static/'):
+        return None
+    if not _app_initialized:
+        with app.app_context():
+            ok = ensure_initialized()
+        if not ok:
+            return jsonify({
+                'error': 'initializing',
+                'message': f'服务启动中: {_init_error}'
+            }), 503
+
+
+@app.route('/api/health')
+def api_health():
+    ok = _app_initialized
+    return jsonify({
+        'status': 'ok' if ok else 'starting',
+        'initialized': ok,
+        'error': _init_error,
+        'patients': Patient.query.count() if ok else -1,
+        'tables': [] if ok else None,
+    })
+
+
+@app.route('/health')
+def health_page():
+    return api_health()
+
+
 def _parse_float(s):
     if not s or s == '' or s == 'None':
         return 0.0
@@ -1155,41 +1250,13 @@ def _parse_int(s):
         return 0
 
 
-# Auto-import on first run (runs at module load time for both dev and gunicorn)
-with app.app_context():
-    # Force create employees table (handle case where old db exists without it)
-    from sqlalchemy import text as sa_text
-    try:
-        db.session.execute(sa_text('''
-            CREATE TABLE IF NOT EXISTS employees (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username VARCHAR(50) NOT NULL UNIQUE,
-                password VARCHAR(200) NOT NULL,
-                display_name VARCHAR(50) DEFAULT '',
-                role VARCHAR(20) DEFAULT 'staff',
-                can_view_appointments BOOLEAN DEFAULT 1,
-                can_view_transactions BOOLEAN DEFAULT 1,
-                can_edit_patients BOOLEAN DEFAULT 1,
-                is_active BOOLEAN DEFAULT 1,
-                created_at TIMESTAMP,
-                updated_at TIMESTAMP
-            )
-        '''))
-        db.session.commit()
-    except Exception as e:
-        print(f'⚠️ Employees table create skipped: {e}')
-    
-    db.create_all()  # Create any other new tables
-    if Patient.query.count() == 0:
-        print('📥 Database empty, importing data from Excel...')
-        try:
-            import import_data
-            import_data.import_from_files(app)
-            print(f'✅ Import complete: {Patient.query.count()} patients')
-        except Exception as e:
-            import traceback
-            print(f'⚠️ Auto-import failed: {e}')
-            traceback.print_exc()
+# Start initialization in background thread so server is immediately responsive
+import threading
+def _run_init():
+    with app.app_context():
+        ensure_initialized()
+t = threading.Thread(target=_run_init, daemon=True)
+t.start()
 
 if __name__ == '__main__':
 
