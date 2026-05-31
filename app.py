@@ -1133,7 +1133,29 @@ def _parse_int(s):
 
 # Auto-import on first run (runs at module load time for both dev and gunicorn)
 with app.app_context():
-    db.create_all()  # Ensure all tables exist
+    # Force create employees table (handle case where old db exists without it)
+    from sqlalchemy import text as sa_text
+    try:
+        db.session.execute(sa_text('''
+            CREATE TABLE IF NOT EXISTS employees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(50) NOT NULL UNIQUE,
+                password VARCHAR(200) NOT NULL,
+                display_name VARCHAR(50) DEFAULT '',
+                role VARCHAR(20) DEFAULT 'staff',
+                can_view_appointments BOOLEAN DEFAULT 1,
+                can_view_transactions BOOLEAN DEFAULT 1,
+                can_edit_patients BOOLEAN DEFAULT 1,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP,
+                updated_at TIMESTAMP
+            )
+        '''))
+        db.session.commit()
+    except Exception as e:
+        print(f'⚠️ Employees table create skipped: {e}')
+    
+    db.create_all()  # Create any other new tables
     if Patient.query.count() == 0:
         print('📥 Database empty, importing data from Excel...')
         try:
