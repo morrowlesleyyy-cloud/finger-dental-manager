@@ -26,13 +26,17 @@ else:
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-from models import db, Patient, Appointment, Transaction
+from models import db, Patient, Appointment, Transaction, Employee
 db.init_app(app)
 
 # =================== Auth Configuration ===================
 # Change these via environment variables
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+
+# Store current user info in flask_session keys:
+# logged_in, username, user_role, user_id
+# role: 'admin' or 'staff'
 
 def login_required(f):
     """Require valid session for route."""
@@ -108,10 +112,36 @@ def api_login():
     username = data.get('username', '')
     password = data.get('password', '')
     
+    # Check admin (super user)
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
         flask_session['logged_in'] = True
         flask_session['username'] = username
-        return jsonify({'success': True})
+        flask_session['user_role'] = 'admin'
+        flask_session['user_id'] = 0
+        flask_session['display_name'] = username
+        flask_session['permissions'] = {
+            'can_view_appointments': True,
+            'can_view_transactions': True,
+            'can_edit_patients': True,
+            'is_admin': True,
+        }
+        return jsonify({'success': True, 'role': 'admin'})
+    
+    # Check employee accounts
+    emp = Employee.query.filter_by(username=username, is_active=True).first()
+    if emp and emp.password == password:
+        flask_session['logged_in'] = True
+        flask_session['username'] = emp.username
+        flask_session['user_role'] = emp.role
+        flask_session['user_id'] = emp.id
+        flask_session['display_name'] = emp.display_name or emp.username
+        flask_session['permissions'] = {
+            'can_view_appointments': emp.can_view_appointments,
+            'can_view_transactions': emp.can_view_transactions,
+            'can_edit_patients': emp.can_edit_patients,
+            'is_admin': emp.role == 'admin',
+        }
+        return jsonify({'success': True, 'role': emp.role})
     
     return jsonify({'success': False, 'error': '用户名或密码错误'}), 401
 
@@ -127,7 +157,93 @@ def api_auth_check():
     return jsonify({
         'logged_in': flask_session.get('logged_in', False),
         'username': flask_session.get('username', ''),
+        'display_name': flask_session.get('display_name', ''),
+        'role': flask_session.get('user_role', ''),
+        'permissions': flask_session.get('permissions', {}),
     })
+
+
+# =================== Employee Management API ===================
+
+@app.route('/employees')
+def employees_page():
+    return no_cache(render_template('base.html'))
+
+
+@app.route('/api/employees')
+def api_list_employees():
+    err = require_admin()
+    if err:
+        return err
+    employees = Employee.query.order_by(Employee.id).all()
+    return jsonify({'data': [e.to_dict() for e in employees]})
+
+
+@app.route('/api/employees', methods=['POST'])
+def api_create_employee():
+    err = require_admin()
+    if err:
+        return err
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    if not username:
+        return jsonify({'error': '请输入用户名'}), 400
+    password = data.get('password', '').strip()
+    if not password:
+        return jsonify({'error': '请输入密码'}), 400
+    
+    if Employee.query.filter_by(username=username).first():
+        return jsonify({'error': '用户名已存在'}), 400
+    
+    emp = Employee(
+        username=username,
+        password=password,
+        display_name=data.get('display_name', ''),
+        role='staff',
+        can_view_appointments=data.get('can_view_appointments', True),
+        can_view_transactions=data.get('can_view_transactions', True),
+        can_edit_patients=data.get('can_edit_patients', True),
+    )
+    db.session.add(emp)
+    db.session.commit()
+    return jsonify({'success': True, 'data': emp.to_dict()})
+
+
+@app.route('/api/employees/<int:eid>', methods=['PUT'])
+def api_update_employee(eid):
+    err = require_admin()
+    if err:
+        return err
+    emp = Employee.query.get_or_404(eid)
+    data = request.get_json()
+    
+    if 'username' in data:
+        u = data['username'].strip()
+        if u and u != emp.username:
+            if Employee.query.filter_by(username=u).first():
+                return jsonify({'error': '用户名已存在'}), 400
+            emp.username = u
+    if 'password' in data and data['password'].strip():
+        emp.password = data['password'].strip()
+    if 'display_name' in data:
+        emp.display_name = data['display_name']
+    for field in ['can_view_appointments', 'can_view_transactions', 'can_edit_patients', 'is_active']:
+        if field in data:
+            setattr(emp, field, bool(data[field]))
+    
+    db.session.commit()
+    return jsonify({'success': True, 'data': emp.to_dict()})
+
+
+@app.route('/api/employees/<int:eid>', methods=['DELETE'])
+def api_delete_employee(eid):
+    err = require_admin()
+    if err:
+        return err
+    emp = Employee.query.get_or_404(eid)
+    db.session.delete(emp)
+    db.session.commit()
+    return jsonify({'success': True})
 
 
 # =================== 主页 / Dashboard ===================
@@ -347,6 +463,9 @@ def appointments_page():
 
 @app.route('/api/appointments')
 def api_appointments():
+    err = require_permission('can_view_appointments')
+    if err:
+        return err
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     status = request.args.get('status', '')
@@ -497,6 +616,9 @@ def transactions_page():
 
 @app.route('/api/transactions')
 def api_transactions():
+    err = require_permission('can_view_transactions')
+    if err:
+        return err
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     search = request.args.get('search', '').strip()
@@ -632,6 +754,9 @@ def reports_page():
 
 @app.route('/api/reports/overview')
 def api_reports_overview():
+    err = require_permission('can_view_transactions')
+    if err:
+        return err
     year = request.args.get('year', date.today().year, type=int)
 
     # 月度业绩
