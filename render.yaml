@@ -1,0 +1,18 @@
+# Render Blueprint - MEYA Dental Management System
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: finger-dental-manager
+    runtime: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python3 app.py
+    envVars:
+      - key: RENDER
+        value: "true"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: SECRET_KEY
+        generateValue: true
