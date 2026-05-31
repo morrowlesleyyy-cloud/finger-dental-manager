@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEYA Dental 管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --sidebar-width: 240px;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #f5f6fa;
+        }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        .sidebar-brand {
+            padding: 20px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar-brand small {
+            font-size: 0.7rem;
+            opacity: 0.6;
+            font-weight: 400;
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.7);
+            padding: 12px 20px;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+            color: #fff;
+            background: rgba(255,255,255,0.08);
+            border-left-color: #4cc9f0;
+        }
+        .sidebar .nav-link i {
+            width: 22px;
+            margin-right: 8px;
+        }
+        .main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+        }
+        .page-header {
+            padding: 20px 30px;
+            background: #fff;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .page-body {
+            padding: 24px 30px;
+        }
+        .stat-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        }
+        .stat-card .icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+        .stat-card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        .stat-card .label {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        .badge-outline {
+            background: transparent;
+            border: 1px solid currentColor;
+        }
+        .table-hover tbody tr {
+            cursor: pointer;
+        }
+        .table-hover tbody tr:hover {
+            background: #f0f7ff;
+        }
+        .chart-container {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .consultant-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        .toast-container {
+            z-index: 9999;
+        }
+        .modal-content {
+            border: none;
+            border-radius: 12px;
+        }
+        .modal-header {
+            border-bottom: 1px solid #eee;
+            padding: 16px 20px;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .form-label {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        .page-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .page-body {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+    <div class="sidebar-brand">
+        🦷 MEYA Dental
+        <small>唯欧口腔管理系统</small>
+    </div>
+    <nav class="nav flex-column mt-2">
+        <a class="nav-link" href="/" data-page="dashboard">
+            <i class="bi bi-speedometer2"></i> 首页看板
+        </a>
+        <a class="nav-link" href="/patients" data-page="patients">
+            <i class="bi bi-people"></i> 患者管理
+        </a>
+        <a class="nav-link" href="/appointments" data-page="appointments">
+            <i class="bi bi-calendar-check"></i> 预约管理
+        </a>
+        <a class="nav-link" href="/transactions" data-page="transactions">
+            <i class="bi bi-cash-stack"></i> 成交管理
+        </a>
+        <a class="nav-link" href="/reports" data-page="reports">
+            <i class="bi bi-bar-chart"></i> 数据报表
+        </a>
+        <a class="nav-link" href="/import" data-page="import">
+            <i class="bi bi-upload"></i> 数据导入
+        </a>
+    </nav>
+</div>
+
+<!-- Main Content -->
+<div class="main-content" id="mainContent">
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <h5 class="page-title mb-0" id="pageTitle">首页看板</h5>
+        <div>
+            <button class="btn btn-outline-secondary btn-sm me-2" onclick="refreshPage()">
+                <i class="bi bi-arrow-clockwise"></i> 刷新
+            </button>
+            <span class="text-muted small" id="clockDisplay"></span>
+        </div>
+    </div>
+    <div class="page-body" id="pageBody">
+        <!-- Content loaded dynamically -->
+    </div>
+</div>
+
+<!-- Form Modal -->
+<div class="modal fade" id="formModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="formModalLabel"></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="formBody"></div>
+            <div class="modal-footer border-0 pt-0">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button class="btn btn-primary" onclick="saveForm()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="detailModalLabel">患者详情</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detailModalBody"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong class="me-auto" id="toastTitle">提示</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="toastBody"></div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+<script>
+// ===================== Utility Functions =====================
+
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('liveToast');
+    const body = document.getElementById('toastBody');
+    const title = document.getElementById('toastTitle');
+    const icon = toast.querySelector('.toast-header i');
+
+    body.textContent = message;
+    if (type === 'success') {
+        title.textContent = '✅ 成功';
+        icon.className = 'bi bi-check-circle text-success me-2';
+    } else if (type === 'error') {
+        title.textContent = '❌ 错误';
+        icon.className = 'bi bi-exclamation-triangle text-danger me-2';
+    } else {
+        title.textContent = 'ℹ️ 提示';
+        icon.className = 'bi bi-info-circle text-info me-2';
+    }
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+}
+
+function saveForm() {
+    const type = document.getElementById('formType')?.value;
+    if (type === 'patient') savePatientForm();
+    else if (type === 'appointment') saveAppointmentForm();
+    else if (type === 'transaction') saveTransactionForm();
+    else showToast('未知表单类型', 'error');
+}
+
+function formatMoney(n) {
+    if (!n || n === 0) return 'RM 0';
+    return 'RM ' + Number(n).toLocaleString('en-MY', {minimumFractionDigits: 0});
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
+// ===================== Router =====================
+
+const PAGES = {
+    dashboard: { title: '首页看板', render: renderDashboard },
+    patients: { title: '患者管理', render: renderPatients },
+    appointments: { title: '预约管理', render: renderAppointments },
+    transactions: { title: '成交管理', render: renderTransactions },
+    reports: { title: '数据报表', render: renderReports },
+    import: { title: '数据导入', render: renderImport },
+};
+
+function navigateTo(page) {
+    // Update URL
+    const url = page === 'dashboard' ? '/' : '/' + page;
+    window.history.pushState({}, '', url);
+
+    // Update sidebar
+    document.querySelectorAll('.sidebar .nav-link').forEach(el => {
+        el.classList.toggle('active', el.dataset.page === page);
+    });
+
+    // Render page
+    const entry = PAGES[page];
+    if (entry) {
+        document.getElementById('pageTitle').textContent = entry.title;
+        document.getElementById('pageBody').innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted">加载中...</p></div>';
+        entry.render();
+    }
+}
+
+function refreshPage() {
+    const page = getCurrentPage();
+    const entry = PAGES[page];
+    if (entry) entry.render();
+}
+
+function getCurrentPage() {
+    const path = window.location.pathname;
+    if (path === '/' || path === '') return 'dashboard';
+    return path.replace('/', '');
+}
+
+// Initial load
+window.addEventListener('DOMContentLoaded', () => {
+    updateClock();
+    setInterval(updateClock, 1000);
+    navigateTo(getCurrentPage());
+});
+
+// Handle browser back/forward
+window.addEventListener('popstate', () => {
+    navigateTo(getCurrentPage());
+});
+
+// Sidebar click
+document.querySelectorAll('.sidebar .nav-link').forEach(el => {
+    el.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigateTo(el.dataset.page);
+    });
+});
+
+function updateClock() {
+    const now = new Date();
+    const opts = { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
+                   hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' };
+    document.getElementById('clockDisplay').textContent = now.toLocaleString('zh-CN', opts);
+}
+
+// ===================== SSE =====================
+
+let eventSource = null;
+
+function connectSSE() {
+    if (eventSource) eventSource.close();
+    eventSource = new EventSource('/api/events');
+
+    eventSource.addEventListener('connected', () => {
+        console.log('SSE connected');
+    });
+
+    ['patient_created', 'patient_updated', 'patient_deleted',
+     'appointment_created', 'appointment_updated', 'appointment_deleted',
+     'transaction_created', 'transaction_updated', 'transaction_deleted'].forEach(evt => {
+        eventSource.addEventListener(evt, () => {
+            // Refresh dashboard if on dashboard
+            if (getCurrentPage() === 'dashboard') {
+                renderDashboard();
+            }
+        });
+    });
+
+    eventSource.onerror = () => {
+        console.log('SSE error, reconnecting...');
+        setTimeout(connectSSE, 3000);
+    };
+}
+
+// Start SSE after initial load
+setTimeout(connectSSE, 1000);
+
+// ===================== Dashboard =====================
+
+async function renderDashboard() {
+    const body = document.getElementById('pageBody');
+    try {
+        const res = await fetch('/api/dashboard');
+        const data = await res.json();
+
+        body.innerHTML = `
+            <!-- Stat Cards -->
+            <div class="row g-3 mb-4" id="statCards">
+                <div class="col-6 col-md-3">
+                    <div class="stat-card">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="icon text-bg-primary"><i class="bi bi-calendar-event"></i></div>
+                            <span class="badge bg-light text-dark">今日</span>
+                        </div>
+                        <div class="value">${data.today_appointments}</div>
+                        <div class="label">今日预约 <small class="text-success ms-1">到访 ${data.today_visited}</small></div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="stat-card">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="icon text-bg-success"><i class="bi bi-cash"></i></div>
+                            <span class="badge bg-light text-dark">本月</span>
+                        </div>
+                        <div class="value">${formatMoney(data.monthly_revenue)}</div>
+                        <div class="label">业绩总额 · ${data.monthly_deals} 单成交</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="stat-card">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="icon text-bg-info"><i class="bi bi-person-plus"></i></div>
+                            <span class="badge bg-light text-dark">本月</span>
+                        </div>
+                        <div class="value">${data.monthly_patients}</div>
+                        <div class="label">新增患者 · ${data.monthly_appointments} 次预约</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="stat-card">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="icon text-bg-warning"><i class="bi bi-telephone-forward"></i></div>
+                            <span class="badge bg-light text-dark">待跟进</span>
+                        </div>
+                        <div class="value">${data.pending_followups}</div>
+                        <div class="label">30天内未成交初诊</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <!-- 业绩趋势图 -->
+                <div class="col-12 col-lg-8">
+                    <div class="chart-container">
+                        <h6 class="fw-bold mb-3">📈 本月业绩趋势</h6>
+                        <canvas id="revenueChart" height="200"></canvas>
+                    </div>
+                </div>
+                <!-- 咨询师排名 -->
+                <div class="col-12 col-lg-4">
+                    <div class="chart-container">
+                        <h6 class="fw-bold mb-3">🏆 咨询师本月排名</h6>
+                        <div id="consultantRanking">
+                            ${data.consultant_ranking.length === 0 ? '<p class="text-muted small">暂无数据</p>' :
+                            data.consultant_ranking.map((c, i) => `
+                                <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
+                                    <div>
+                                        <span class="badge bg-secondary me-2">${i + 1}</span>
+                                        <strong>${escapeHtml(c.name)}</strong>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="fw-bold text-success">${formatMoney(c.total)}</div>
+                                        <small class="text-muted">${c.count} 单</small>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+                <!-- 最近预约 -->
+                <div class="col-12 col-lg-6">
+                    <div class="chart-container">
+                        <h6 class="fw-bold mb-3">📋 即将到访</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead><tr>
+                                    <th>日期</th><th>患者</th><th>时间</th><th>邀约人</th><th>状态</th>
+                                </tr></thead>
+                                <tbody>
+                                    ${data.recent_appointments.length === 0 ? '<tr><td colspan="5" class="text-muted text-center">暂无预约</td></tr>' :
+                                    data.recent_appointments.map(a => `
+                                        <tr onclick="navigateTo('appointments')">
+                                            <td class="small">${a.scheduled_date}</td>
+                                            <td><strong>${escapeHtml(a.patient_name)}</strong></td>
+                                            <td>${a.scheduled_time || '-'}</td>
+                                            <td>${escapeHtml(a.inviter) || '-'}</td>
+                                            <td>${formatVisitBadge(a.actual_visit)}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <!-- 最近成交 -->
+                <div class="col-12 col-lg-6">
+                    <div class="chart-container">
+                        <h6 class="fw-bold mb-3">💰 最近成交</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead><tr>
+                                    <th>日期</th><th>患者</th><th>方案</th><th>金额</th><th>咨询师</th>
+                                </tr></thead>
+                                <tbody>
+                                    ${data.recent_transactions.length === 0 ? '<tr><td colspan="5" class="text-muted text-center">暂无成交</td></tr>' :
+                                    data.recent_transactions.map(t => `
+                                        <tr onclick="navigateTo('transactions')">
+                                            <td class="small">${t.payment_date}</td>
+                                            <td><strong>${escapeHtml(t.patient_name)}</strong></td>
+                                            <td>${t.plan_type || '-'}</td>
+                                            <td class="fw-bold text-success">${formatMoney(t.performance_amount)}</td>
+                                            <td>${escapeHtml(t.consultant) || '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Render Chart
+        setTimeout(() => {
+            const ctx = document.getElementById('revenueChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.revenue_trend.map(d => d.date),
+                    datasets: [{
+                        label: '业绩 (RM)',
+                        data: data.revenue_trend.map(d => d.amount),
+                        backgroundColor: 'rgba(76, 201, 240, 0.7)',
+                        borderColor: '#4cc9f0',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { callback: v => 'RM ' + v.toLocaleString() }
+                        }
+                    }
+                }
+            });
+        }, 100);
+
+    } catch (e) {
+        body.innerHTML = `<div class="alert alert-danger">加载失败: ${e.message}</div>`;
+    }
+}
+
+function formatVisitBadge(status) {
+    const map = {
+        '成交': 'success',
+        '定金': 'warning',
+        '定金转成交': 'success',
+        '未成交转成交': 'info',
+        '未成交': 'secondary',
+        '未到访': 'danger',
+        '无效': 'dark',
+        '补费': 'primary',
+    };
+    const cls = map[status] || 'light';
+    return status ? `<span class="badge bg-${cls}">${status}</span>` :
+           `<span class="badge bg-light text-muted">待确认</span>`;
+}
+
+// ===================== Patient List =====================
+
+let patientPage = 1;
+let patientSearch = '';
+
+function renderPatients() {
+    const body = document.getElementById('pageBody');
+    body.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex gap-2">
+                <input class="form-control form-control-sm" style="width:250px" id="patientSearch"
+                       placeholder="🔍 搜索姓名/电话/网咨..." value="${escapeHtml(patientSearch)}">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openPatientModal()">
+                <i class="bi bi-plus-lg"></i> 新增患者
+            </button>
+        </div>
+        <div id="patientTableWrap" class="chart-container p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="patientTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>姓名</th><th>电话</th><th>缺牙</th><th>来源</th>
+                            <th>网咨</th><th>创建日期</th><th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="patientTableBody">
+                        <tr><td colspan="7" class="text-center py-4 text-muted">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center p-3 border-top">
+                <small class="text-muted" id="patientTotal">共 0 条</small>
+                <nav><ul class="pagination pagination-sm mb-0" id="patientPagination"></ul></nav>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('patientSearch').addEventListener('input', (e) => {
+        patientSearch = e.target.value;
+        patientPage = 1;
+        loadPatients();
+    });
+
+    loadPatients();
+
+    // Enter to search
+    document.getElementById('patientSearch').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            patientPage = 1;
+            loadPatients();
+        }
+    });
+}
+
+async function loadPatients() {
+    const tbody = document.getElementById('patientTableBody');
+    try {
+        const res = await fetch(`/api/patients?page=${patientPage}&per_page=20&search=${encodeURIComponent(patientSearch)}`);
+        const data = await res.json();
+
+        if (data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">暂无患者</td></tr>';
+        } else {
+            tbody.innerHTML = data.data.map(p => `
+                <tr onclick="openPatientDetail(${p.id})">
+                    <td><strong>${escapeHtml(p.name)}</strong></td>
+                    <td>${escapeHtml(p.phone) || '-'}</td>
+                    <td>${escapeHtml(p.tooth_count) || '-'}</td>
+                    <td>${escapeHtml(p.source) || '-'}</td>
+                    <td>${escapeHtml(p.online_consultant) || '-'}</td>
+                    <td class="small">${p.created_at}</td>
+                    <td onclick="event.stopPropagation()">
+                        <button class="btn btn-outline-danger btn-sm py-0" onclick="deletePatient(${p.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('patientTotal').textContent = `共 ${data.total} 条`;
+        renderPagination('patientPagination', data.page, data.pages, (p) => {
+            patientPage = p;
+            loadPatients();
+        });
+
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">加载失败: ${e.message}</td></tr>`;
+    }
+}
+
+// ===================== Patient Detail Modal =====================
+
+function openPatientDetail(pid) {
+    fetch(`/api/patients/${pid}`).then(r => r.json()).then(data => {
+        const p = data.patient;
+        const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+        document.getElementById('detailModalLabel').textContent = `👤 ${p.name}`;
+        document.getElementById('detailModalBody').innerHTML = `
+            <div class="row g-3">
+                <div class="col-6"><label class="form-label">电话</label><p class="fw-bold">${escapeHtml(p.phone) || '-'}</p></div>
+                <div class="col-6"><label class="form-label">性别</label><p>${escapeHtml(p.gender) || '-'}</p></div>
+                <div class="col-6"><label class="form-label">年龄</label><p>${p.age || '-'}</p></div>
+                <div class="col-6"><label class="form-label">缺牙颗数</label><p>${escapeHtml(p.tooth_count) || '-'}</p></div>
+                <div class="col-6"><label class="form-label">来源</label><p>${escapeHtml(p.source) || '-'}</p></div>
+                <div class="col-6"><label class="form-label">网咨</label><p>${escapeHtml(p.online_consultant) || '-'}</p></div>
+                <div class="col-12"><label class="form-label">情况描述</label><p class="text-muted small">${escapeHtml(p.condition_desc) || '-'}</p></div>
+            </div>
+            <hr>
+            <h6 class="fw-bold">📅 预约记录 (${data.appointments.length})</h6>
+            ${data.appointments.length === 0 ? '<p class="text-muted small">暂无</p>' : `
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>日期</th><th>类型</th><th>到访</th><th>邀约人</th></tr></thead>
+                    <tbody>${data.appointments.map(a => `
+                        <tr><td>${a.scheduled_date || '-'}</td><td>${a.visit_type || '-'}</td>
+                        <td>${formatVisitBadge(a.actual_visit)}</td><td>${escapeHtml(a.inviter) || '-'}</td></tr>
+                    `).join('')}</tbody>
+                </table>
+            </div>`}
+            <hr>
+            <h6 class="fw-bold">💰 交易记录 (${data.transactions.length})</h6>
+            ${data.transactions.length === 0 ? '<p class="text-muted small">暂无</p>' : `
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>日期</th><th>方案</th><th>业绩</th><th>咨询师</th></tr></thead>
+                    <tbody>${data.transactions.map(t => `
+                        <tr><td>${t.payment_date || '-'}</td><td>${t.plan_type || '-'}</td>
+                        <td class="text-success fw-bold">${formatMoney(t.performance_amount)}</td>
+                        <td>${escapeHtml(t.consultant) || '-'}</td></tr>
+                    `).join('')}</tbody>
+                </table>
+            </div>`}
+        `;
+        modal.show();
+    });
+}
+
+// ===================== Patient CRUD =====================
+
+function openPatientModal(p) {
+    const modal = new bootstrap.Modal(document.getElementById('formModal'));
+    document.getElementById('formModalLabel').textContent = p ? '编辑患者' : '新增患者';
+    const form = document.getElementById('formBody');
+    form.innerHTML = `
+        <input type="hidden" id="formType" value="patient">
+        <input type="hidden" id="patientId" value="${p ? p.id : ''}">
+        <div class="row g-3">
+            <div class="col-6"><label class="form-label">姓名 *</label>
+                <input class="form-control" id="pName" value="${p ? escapeHtml(p.name) : ''}"></div>
+            <div class="col-6"><label class="form-label">电话</label>
+                <input class="form-control" id="pPhone" value="${p ? escapeHtml(p.phone) : ''}"></div>
+            <div class="col-4"><label class="form-label">性别</label>
+                <select class="form-select" id="pGender">
+                    <option value="">不限</option><option value="男" ${p && p.gender === '男' ? 'selected' : ''}>男</option>
+                    <option value="女" ${p && p.gender === '女' ? 'selected' : ''}>女</option>
+                </select></div>
+            <div class="col-4"><label class="form-label">年龄</label>
+                <input class="form-control" type="number" id="pAge" value="${p ? p.age || '' : ''}"></div>
+            <div class="col-4"><label class="form-label">缺牙颗数</label>
+                <select class="form-select" id="pToothCount">
+                    <option value="">不限</option>
+                    <option value="少颗(1-3颗)" ${p && p.tooth_count === '少颗(1-3颗)' ? 'selected' : ''}>少颗(1-3颗)</option>
+                    <option value="多颗(半口以下 3颗以上)" ${p && p.tooth_count === '多颗(半口以下 3颗以上)' ? 'selected' : ''}>多颗</option>
+                    <option value="半口/全口" ${p && p.tooth_count === '半口/全口' ? 'selected' : ''}>半口/全口</option>
+                    <option value="全口" ${p && p.tooth_count === '全口' ? 'selected' : ''}>全口</option>
+                </select></div>
+            <div class="col-6"><label class="form-label">来源</label>
+                <select class="form-select" id="pSource">
+                    <option value="">请选择</option>
+                    <option value="网咨" ${p && p.source === '网咨' ? 'selected' : ''}>网咨</option>
+                    <option value="患者转介绍" ${p && p.source === '患者转介绍' ? 'selected' : ''}>转介绍</option>
+                    <option value="自然到店" ${p && p.source === '自然到店' ? 'selected' : ''}>自然到店</option>
+                </select></div>
+            <div class="col-6"><label class="form-label">网咨</label>
+                <input class="form-control" id="pConsultant" value="${p ? escapeHtml(p.online_consultant) : ''}"></div>
+            <div class="col-12"><label class="form-label">情况描述</label>
+                <textarea class="form-control" id="pCondition" rows="3">${p ? escapeHtml(p.condition_desc) : ''}</textarea></div>
+        </div>
+    `;
+    modal.show();
+}
+
+async function savePatientForm() {
+    const id = document.getElementById('patientId').value;
+    const data = {
+        name: document.getElementById('pName').value.trim(),
+        phone: document.getElementById('pPhone').value.trim(),
+        gender: document.getElementById('pGender').value,
+        age: parseInt(document.getElementById('pAge').value) || 0,
+        tooth_count: document.getElementById('pToothCount').value,
+        source: document.getElementById('pSource').value,
+        online_consultant: document.getElementById('pConsultant').value.trim(),
+        condition_desc: document.getElementById('pCondition').value.trim(),
+    };
+    if (!data.name) { showToast('请输入患者姓名', 'error'); return; }
+
+    try {
+        const url = id ? `/api/patients/${id}` : '/api/patients';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+        const result = await res.json();
+        if (result.success) {
+            showToast(id ? '患者已更新' : '患者已创建');
+            bootstrap.Modal.getInstance(document.getElementById('formModal')).hide();
+            loadPatients();
+        } else {
+            showToast(result.error || '保存失败', 'error');
+        }
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+
+async function deletePatient(pid) {
+    if (!confirm('确认删除该患者吗？所有关联的预约和交易记录也会被删除。')) return;
+    try {
+        const res = await fetch(`/api/patients/${pid}`, {method: 'DELETE'});
+        const data = await res.json();
+        if (data.success) {
+            showToast('已删除');
+            loadPatients();
+        }
+    } catch (e) {
+        showToast('删除失败', 'error');
+    }
+}
+
+// ===================== Pagination =====================
+
+function renderPagination(containerId, current, total, onClick) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (total <= 1) { container.innerHTML = ''; return; }
+
+    let html = '';
+    const addPage = (p, label) => {
+        html += `<li class="page-item ${p === current ? 'active' : ''}">
+            <a class="page-link" href="#" data-page="${p}">${label || p}</a></li>`;
+    };
+
+    addPage(1);
+    if (current > 3) html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+    for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p++) {
+        addPage(p);
+    }
+    if (current < total - 2) html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+    if (total > 1) addPage(total);
+
+    container.innerHTML = html;
+    container.querySelectorAll('a.page-link').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.preventDefault();
+            onClick(parseInt(el.dataset.page));
+        });
+    });
+}
+
+// ===================== Appointments Page =====================
+
+let apptPage = 1;
+let apptStatus = '';
+let apptSearch = '';
+let apptMonth = '';
+
+function renderAppointments() {
+    const body = document.getElementById('pageBody');
+    body.innerHTML = `
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <input class="form-control form-control-sm" style="width:200px" id="apptSearch"
+                   placeholder="🔍 搜索患者/邀约人...">
+            <select class="form-select form-select-sm" style="width:auto" id="apptFilter">
+                <option value="">全部预约</option>
+                <option value="today">今日</option>
+                <option value="upcoming">未来</option>
+                <option value="past">历史</option>
+                <option value="visited">已到访</option>
+                <option value="noshow">未到访</option>
+                <option value="nodata">待确认状态</option>
+                <option value="deals">已成交</option>
+            </select>
+            <input class="form-control form-control-sm" style="width:150px" id="apptMonth" type="month">
+            <button class="btn btn-primary btn-sm" onclick="openAppointmentModal()">
+                <i class="bi bi-plus-lg"></i> 新建预约
+            </button>
+        </div>
+        <div class="chart-container p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>预约日期</th><th>患者</th><th>时间</th><th>邀约人</th><th>类型</th><th>实际到访</th><th>操作</th></tr>
+                    </thead>
+                    <tbody id="apptTableBody">
+                        <tr><td colspan="7" class="text-center py-4 text-muted">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center p-3 border-top">
+                <small class="text-muted" id="apptTotal">共 0 条</small>
+                <nav><ul class="pagination pagination-sm mb-0" id="apptPagination"></ul></nav>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('apptSearch').addEventListener('input', (e) => {
+        apptSearch = e.target.value;
+        apptPage = 1;
+        loadAppointments();
+    });
+    document.getElementById('apptFilter').addEventListener('change', (e) => {
+        apptStatus = e.target.value;
+        apptPage = 1;
+        loadAppointments();
+    });
+    document.getElementById('apptMonth').addEventListener('change', (e) => {
+        apptMonth = e.target.value;
+        apptPage = 1;
+        loadAppointments();
+    });
+    loadAppointments();
+}
+
+async function loadAppointments() {
+    const tbody = document.getElementById('apptTableBody');
+    const params = new URLSearchParams({
+        page: apptPage, per_page: 20,
+        search: apptSearch,
+        status: apptStatus,
+        month: apptMonth,
+    });
+    try {
+        const res = await fetch('/api/appointments?' + params);
+        const data = await res.json();
+        if (data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">暂无预约</td></tr>';
+        } else {
+            tbody.innerHTML = data.data.map(a => `
+                <tr onclick="openAppointmentModal(${a.id})">
+                    <td class="small">${a.scheduled_date || '-'}</td>
+                    <td><strong>${escapeHtml(a.patient_name)}</strong></td>
+                    <td>${a.scheduled_time || '-'}</td>
+                    <td>${escapeHtml(a.inviter) || '-'}</td>
+                    <td>${a.visit_type || '-'}</td>
+                    <td>${formatVisitBadge(a.actual_visit)}</td>
+                    <td onclick="event.stopPropagation()">
+                        <button class="btn btn-outline-danger btn-sm py-0" onclick="deleteAppointment(${a.id})"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        document.getElementById('apptTotal').textContent = `共 ${data.total} 条`;
+        renderPagination('apptPagination', data.page, data.pages, (p) => { apptPage = p; loadAppointments(); });
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">加载失败</td></tr>';
+    }
+}
+
+function openAppointmentModal(id) {
+    // Fetch detail if id provided
+    const fetchData = id ? fetch('/api/appointments?per_page=1').then(r => r.json()).then(d => d.data.find(a => a.id === id)) : Promise.resolve(null);
+    fetchData.then(appt => {
+        const modal = new bootstrap.Modal(document.getElementById('formModal'));
+        document.getElementById('formModalLabel').textContent = appt ? '编辑预约' : '新建预约';
+        const form = document.getElementById('formBody');
+        form.innerHTML = `
+            <input type="hidden" id="formType" value="appointment">
+            <input type="hidden" id="apptId" value="${appt ? appt.id : ''}">
+            <div class="row g-3">
+                <div class="col-6">
+                    <label class="form-label">患者 *</label>
+                    <div class="input-group">
+                        <input class="form-control" id="aPatientName" list="patientList" value="${appt ? escapeHtml(appt.patient_name) : ''}" placeholder="输入患者名或搜索">
+                        <datalist id="patientList"></datalist>
+                    </div>
+                </div>
+                <div class="col-6"><label class="form-label">电话</label>
+                    <input class="form-control" id="aPhone" value="${appt ? escapeHtml(appt.phone) : ''}"></div>
+                <div class="col-4"><label class="form-label">预约日期</label>
+                    <input class="form-control" id="aScheduledDate" type="date" value="${appt ? appt.scheduled_date : ''}"></div>
+                <div class="col-4"><label class="form-label">时间</label>
+                    <input class="form-control" id="aScheduledTime" value="${appt ? escapeHtml(appt.scheduled_time) : ''}" placeholder="如 10:30AM"></div>
+                <div class="col-4"><label class="form-label">登记日期</label>
+                    <input class="form-control" id="aRegisteredDate" type="date" value="${appt ? appt.registered_date : ''}"></div>
+                <div class="col-4"><label class="form-label">邀约人</label>
+                    <input class="form-control" id="aInviter" value="${appt ? escapeHtml(appt.inviter) : ''}"></div>
+                <div class="col-4"><label class="form-label">到访类型</label>
+                    <select class="form-select" id="aVisitType">
+                        <option value="">请选择</option>
+                        <option value="初诊" ${appt && appt.visit_type === '初诊' ? 'selected' : ''}>初诊</option>
+                        <option value="复诊" ${appt && appt.visit_type === '复诊' ? 'selected' : ''}>复诊</option>
+                        <option value="其他" ${appt && appt.visit_type === '其他' ? 'selected' : ''}>其他</option>
+                    </select></div>
+                <div class="col-4"><label class="form-label">实际到访</label>
+                    <select class="form-select" id="aActualVisit">
+                        <option value="">待确认</option>
+                        <option value="成交" ${appt && appt.actual_visit === '成交' ? 'selected' : ''}>成交</option>
+                        <option value="定金" ${appt && appt.actual_visit === '定金' ? 'selected' : ''}>定金</option>
+                        <option value="定金转成交" ${appt && appt.actual_visit === '定金转成交' ? 'selected' : ''}>定金转成交</option>
+                        <option value="未成交转成交" ${appt && appt.actual_visit === '未成交转成交' ? 'selected' : ''}>未成交转成交</option>
+                        <option value="未成交" ${appt && appt.actual_visit === '未成交' ? 'selected' : ''}>未成交</option>
+                        <option value="未到访" ${appt && appt.actual_visit === '未到访' ? 'selected' : ''}>未到访</option>
+                        <option value="无效" ${appt && appt.actual_visit === '无效' ? 'selected' : ''}>无效</option>
+                        <option value="补费" ${appt && appt.actual_visit === '补费' ? 'selected' : ''}>补费</option>
+                    </select></div>
+                <div class="col-12"><label class="form-label">咨询跟进情况</label>
+                    <textarea class="form-control" id="aNotes" rows="3">${appt ? escapeHtml(appt.consultation_notes) : ''}</textarea></div>
+            </div>
+        `;
+        modal.show();
+
+        // Patient search autocomplete
+        document.getElementById('aPatientName').addEventListener('input', async (e) => {
+            const val = e.target.value.trim();
+            if (val.length < 1) return;
+            const res = await fetch('/api/search/patients?q=' + encodeURIComponent(val));
+            const patients = await res.json();
+            const dl = document.getElementById('patientList');
+            dl.innerHTML = patients.map(p => `<option value="${escapeHtml(p.name)}">`).join('');
+        });
+    });
+}
+
+async function saveAppointmentForm() {
+    const name = document.getElementById('aPatientName').value.trim();
+    const data = {
+        patient_name: name,
+        phone: document.getElementById('aPhone').value.trim(),
+        scheduled_date: document.getElementById('aScheduledDate').value,
+        scheduled_time: document.getElementById('aScheduledTime').value.trim(),
+        registered_date: document.getElementById('aRegisteredDate').value,
+        inviter: document.getElementById('aInviter').value.trim(),
+        visit_type: document.getElementById('aVisitType').value,
+        actual_visit: document.getElementById('aActualVisit').value,
+        consultation_notes: document.getElementById('aNotes').value.trim(),
+    };
+    if (!name) { showToast('请输入患者姓名', 'error'); return; }
+
+    const id = document.getElementById('apptId').value;
+    try {
+        const url = id ? '/api/appointments/' + id : '/api/appointments';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+        const result = await res.json();
+        if (result.success) {
+            showToast(id ? '预约已更新' : '预约已创建');
+            bootstrap.Modal.getInstance(document.getElementById('formModal')).hide();
+            loadAppointments();
+        } else {
+            showToast(result.error || '保存失败', 'error');
+        }
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+
+async function deleteAppointment(id) {
+    if (!confirm('确认删除这条预约记录？')) return;
+    try {
+        const res = await fetch('/api/appointments/' + id, {method: 'DELETE'});
+        const data = await res.json();
+        if (data.success) { showToast('已删除'); loadAppointments(); }
+    } catch (e) { showToast('删除失败', 'error'); }
+}
+
+// ===================== Transactions Page =====================
+
+let txnPage = 1;
+let txnSearch = '';
+let txnMonth = '';
+
+function renderTransactions() {
+    const body = document.getElementById('pageBody');
+    const now = new Date();
+    const defaultMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    body.innerHTML = `
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <input class="form-control form-control-sm" style="width:200px" id="txnSearch"
+                   placeholder="🔍 搜索患者/咨询师...">
+            <input class="form-control form-control-sm" style="width:150px" id="txnMonth" type="month" value="${defaultMonth}">
+            <button class="btn btn-primary btn-sm" onclick="openTransactionModal()">
+                <i class="bi bi-plus-lg"></i> 新增成交
+            </button>
+        </div>
+        <div class="chart-container p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>日期</th><th>患者</th><th>方案</th><th>业绩</th><th>已付</th><th>定金</th><th>咨询师</th><th>操作</th></tr>
+                    </thead>
+                    <tbody id="txnTableBody">
+                        <tr><td colspan="8" class="text-center py-4 text-muted">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center p-3 border-top">
+                <small class="text-muted" id="txnTotal">共 0 条</small>
+                <nav><ul class="pagination pagination-sm mb-0" id="txnPagination"></ul></nav>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('txnSearch').addEventListener('input', (e) => {
+        txnSearch = e.target.value;
+        txnPage = 1;
+        loadTransactions();
+    });
+    document.getElementById('txnMonth').addEventListener('change', (e) => {
+        txnMonth = e.target.value;
+        txnPage = 1;
+        loadTransactions();
+    });
+    loadTransactions();
+}
+
+async function loadTransactions() {
+    const tbody = document.getElementById('txnTableBody');
+    const params = new URLSearchParams({ page: txnPage, per_page: 20, search: txnSearch, month: txnMonth });
+    try {
+        const res = await fetch('/api/transactions?' + params);
+        const data = await res.json();
+        if (data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">暂无成交记录</td></tr>';
+        } else {
+            tbody.innerHTML = data.data.map(t => `
+                <tr onclick="openTransactionModal(${t.id})">
+                    <td class="small">${t.payment_date || '-'}</td>
+                    <td><strong>${escapeHtml(t.patient_name)}</strong></td>
+                    <td>${t.plan_type || '-'}</td>
+                    <td class="fw-bold text-success">${formatMoney(t.performance_amount)}</td>
+                    <td>${formatMoney(t.paid_amount)}</td>
+                    <td>${formatMoney(t.deposit_amount)}</td>
+                    <td>${escapeHtml(t.consultant) || '-'}</td>
+                    <td onclick="event.stopPropagation()">
+                        <button class="btn btn-outline-danger btn-sm py-0" onclick="deleteTransaction(${t.id})"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        document.getElementById('txnTotal').textContent = `共 ${data.total} 条`;
+        renderPagination('txnPagination', data.page, data.pages, (p) => { txnPage = p; loadTransactions(); });
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">加载失败</td></tr>';
+    }
+}
+
+function openTransactionModal(id) {
+    fetch('/api/transactions?per_page=100').then(r => r.json()).then(d => {
+        const txn = id ? d.data.find(t => t.id === id) : null;
+        const modal = new bootstrap.Modal(document.getElementById('formModal'));
+        document.getElementById('formModalLabel').textContent = txn ? '编辑成交' : '新增成交';
+        const form = document.getElementById('formBody');
+        form.innerHTML = `
+            <input type="hidden" id="formType" value="transaction">
+            <input type="hidden" id="txnId" value="${txn ? txn.id : ''}">
+            <div class="row g-3">
+                <div class="col-6"><label class="form-label">患者 *</label>
+                    <input class="form-control" id="tPatientName" value="${txn ? escapeHtml(txn.patient_name) : ''}" placeholder="输入患者名"></div>
+                <div class="col-6"><label class="form-label">咨询师</label>
+                    <input class="form-control" id="tConsultant" value="${txn ? escapeHtml(txn.consultant) : ''}"></div>
+                <div class="col-4"><label class="form-label">方案类型</label>
+                    <select class="form-select" id="tPlanType">
+                        <option value="">请选择</option>
+                        <option value="种植" ${txn && txn.plan_type === '种植' ? 'selected' : ''}>种植</option>
+                        <option value="全科" ${txn && txn.plan_type === '全科' ? 'selected' : ''}>全科</option>
+                    </select></div>
+                <div class="col-4"><label class="form-label">成交类型</label>
+                    <select class="form-select" id="tOutcome">
+                        <option value="">请选择</option>
+                        <option value="成交" ${txn && txn.visit_outcome === '成交' ? 'selected' : ''}>成交</option>
+                        <option value="定金" ${txn && txn.visit_outcome === '定金' ? 'selected' : ''}>定金</option>
+                        <option value="定金转成交" ${txn && txn.visit_outcome === '定金转成交' ? 'selected' : ''}>定金转成交</option>
+                        <option value="未成交转成交" ${txn && txn.visit_outcome === '未成交转成交' ? 'selected' : ''}>未成交转成交</option>
+                    </select></div>
+                <div class="col-4"><label class="form-label">颗数</label>
+                    <input class="form-control" type="number" id="tToothCount" value="${txn ? txn.tooth_count || '' : ''}"></div>
+                <div class="col-4"><label class="form-label">业绩金额</label>
+                    <input class="form-control" type="number" id="tPerfAmount" value="${txn ? txn.performance_amount : ''}"></div>
+                <div class="col-4"><label class="form-label">已付金额</label>
+                    <input class="form-control" type="number" id="tPaidAmount" value="${txn ? txn.paid_amount : ''}"></div>
+                <div class="col-4"><label class="form-label">交款日期</label>
+                    <input class="form-control" type="date" id="tPaymentDate" value="${txn ? txn.payment_date : ''}"></div>
+                <div class="col-4"><label class="form-label">定金金额</label>
+                    <input class="form-control" type="number" id="tDepositAmount" value="${txn ? txn.deposit_amount : ''}"></div>
+                <div class="col-4"><label class="form-label">定金合同额</label>
+                    <input class="form-control" type="number" id="tDepositContract" value="${txn ? txn.deposit_contract : ''}"></div>
+                <div class="col-4"><label class="form-label">成交额</label>
+                    <input class="form-control" type="number" id="tTotalAmount" value="${txn ? txn.total_amount : ''}"></div>
+            </div>
+        `;
+        modal.show();
+    });
+}
+
+async function saveTransactionForm() {
+    const data = {
+        patient_name: document.getElementById('tPatientName').value.trim(),
+        consultant: document.getElementById('tConsultant').value.trim(),
+        plan_type: document.getElementById('tPlanType').value,
+        visit_outcome: document.getElementById('tOutcome').value,
+        tooth_count: parseInt(document.getElementById('tToothCount').value) || 0,
+        performance_amount: parseFloat(document.getElementById('tPerfAmount').value) || 0,
+        paid_amount: parseFloat(document.getElementById('tPaidAmount').value) || 0,
+        payment_date: document.getElementById('tPaymentDate').value,
+        deposit_amount: parseFloat(document.getElementById('tDepositAmount').value) || 0,
+        deposit_contract: parseFloat(document.getElementById('tDepositContract').value) || 0,
+        total_amount: parseFloat(document.getElementById('tTotalAmount').value) || 0,
+    };
+    if (!data.patient_name) { showToast('请输入患者姓名', 'error'); return; }
+
+    const id = document.getElementById('txnId').value;
+    try {
+        const url = id ? '/api/transactions/' + id : '/api/transactions';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+        const result = await res.json();
+        if (result.success) {
+            showToast(id ? '成交已更新' : '成交已创建');
+            bootstrap.Modal.getInstance(document.getElementById('formModal')).hide();
+            loadTransactions();
+        } else {
+            showToast(result.error || '保存失败', 'error');
+        }
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+
+async function deleteTransaction(id) {
+    if (!confirm('确认删除这条成交记录？')) return;
+    try {
+        const res = await fetch('/api/transactions/' + id, {method: 'DELETE'});
+        const data = await res.json();
+        if (data.success) { showToast('已删除'); loadTransactions(); }
+    } catch (e) { showToast('删除失败', 'error'); }
+}
+
+// ===================== Reports Page =====================
+
+let reportYear = new Date().getFullYear();
+let revenueChartInstance = null;
+
+function renderReports() {
+    const body = document.getElementById('pageBody');
+    body.innerHTML = `
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <select class="form-select form-select-sm" style="width:auto" id="reportYear">
+                <option value="2026" ${reportYear === 2026 ? 'selected' : ''}>2026</option>
+                <option value="2025" ${reportYear === 2025 ? 'selected' : ''}>2025</option>
+                <option value="2024" ${reportYear === 2024 ? 'selected' : ''}>2024</option>
+            </select>
+            <button class="btn btn-outline-primary btn-sm" onclick="loadReports()">
+                <i class="bi bi-arrow-clockwise"></i> 更新
+            </button>
+        </div>
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="chart-container">
+                    <h6 class="fw-bold mb-3">📊 月度业绩趋势</h6>
+                    <canvas id="reportRevenueChart" height="200"></canvas>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="chart-container">
+                    <h6 class="fw-bold mb-3">🏆 咨询师年度排名</h6>
+                    <div id="reportConsultants"></div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-3">
+                <div class="chart-container">
+                    <h6 class="fw-bold mb-3">📌 客户来源</h6>
+                    <canvas id="sourceChart" height="200"></canvas>
+                </div>
+            </div>
+            <div class="col-12 col-lg-3">
+                <div class="chart-container">
+                    <h6 class="fw-bold mb-3">📌 到访情况</h6>
+                    <canvas id="visitChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('reportYear').addEventListener('change', (e) => {
+        reportYear = parseInt(e.target.value);
+        loadReports();
+    });
+    loadReports();
+}
+
+async function loadReports() {
+    try {
+        const res = await fetch('/api/reports/overview?year=' + reportYear);
+        const data = await res.json();
+
+        // Revenue chart
+        if (revenueChartInstance) revenueChartInstance.destroy();
+        setTimeout(() => {
+            const ctx = document.getElementById('reportRevenueChart');
+            if (!ctx) return;
+            revenueChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.monthly_revenue.map(m => m.month),
+                    datasets: [{
+                        label: '业绩 (RM)',
+                        data: data.monthly_revenue.map(m => m.amount),
+                        backgroundColor: '#4cc9f090',
+                        borderColor: '#4cc9f0',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { callback: v => 'RM ' + v.toLocaleString() } } }
+                }
+            });
+        }, 100);
+
+        // Consultant ranking
+        const consDiv = document.getElementById('reportConsultants');
+        if (data.consultant_ranking.length === 0) {
+            consDiv.innerHTML = '<p class="text-muted small">暂无数据</p>';
+        } else {
+            const maxVal = data.consultant_ranking[0].total;
+            consDiv.innerHTML = data.consultant_ranking.map((c, i) => `
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span><span class="badge bg-secondary me-2">${i+1}</span>${escapeHtml(c.name)}</span>
+                        <span class="fw-bold">${formatMoney(c.total)} (${c.count}单)</span>
+                    </div>
+                    <div class="progress" style="height:8px">
+                        <div class="progress-bar bg-info" role="progressbar"
+                             style="width:${(c.total / maxVal * 100).toFixed(1)}%"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Source chart
+        setTimeout(() => {
+            const ctx2 = document.getElementById('sourceChart');
+            if (!ctx2) return;
+            new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: data.source_analysis.map(s => s.name || '未知'),
+                    datasets: [{
+                        data: data.source_analysis.map(s => s.count),
+                        backgroundColor: ['#4cc9f0', '#f72585', '#7209b7', '#ff9e00', '#06d6a0'],
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
+            });
+        }, 100);
+
+        // Visit chart
+        setTimeout(() => {
+            const ctx3 = document.getElementById('visitChart');
+            if (!ctx3) return;
+            new Chart(ctx3, {
+                type: 'doughnut',
+                data: {
+                    labels: data.visit_analysis.map(s => s.name || '未知'),
+                    datasets: [{
+                        data: data.visit_analysis.map(s => s.count),
+                        backgroundColor: ['#06d6a0', '#118ab2', '#ffd166', '#ef476f', '#073b4c', '#f72585', '#7209b7'],
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
+            });
+        }, 100);
+
+    } catch (e) {
+        showToast('加载报表失败: ' + e.message, 'error');
+    }
+}
+
+// ===================== Import Page =====================
+
+function renderImport() {
+    const body = document.getElementById('pageBody');
+    body.innerHTML = `
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="chart-container">
+                    <h6 class="fw-bold mb-3">📥 从 Excel 导入数据</h6>
+                    <p class="text-muted small">支持导入预约总表 或 接诊业绩表（.xlsx 格式）</p>
+
+                    <div class="mb-3">
+                        <label class="form-label">选择文件</label>
+                        <input class="form-control" type="file" id="importFile" accept=".xlsx">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">表类型</label>
+                        <select class="form-select" id="importType">
+                            <option value="appointment">预约总表</option>
+                            <option value="performance">接诊业绩表</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="uploadAndPreview()">
+                        <i class="bi bi-eye"></i> 预览数据
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-12" id="previewArea" style="display:none">
+                <div class="chart-container">
+                    <h6 class="fw-bold mb-3">👀 数据预览</h6>
+                    <div class="table-responsive" id="previewTable"></div>
+                    <div class="mt-3">
+                        <button class="btn btn-success" onclick="executeImport()">
+                            <i class="bi bi-upload"></i> 确认导入
+                        </button>
+                        <span class="text-muted small ms-2" id="importProgress"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12" id="resultArea" style="display:none">
+                <div class="chart-container">
+                    <h6 class="fw-bold mb-3" id="resultTitle">导入结果</h6>
+                    <div id="resultBody"></div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+let uploadedPath = '';
+let uploadedSheets = [];
+
+async function uploadAndPreview() {
+    const fileInput = document.getElementById('importFile');
+    if (!fileInput.files || !fileInput.files[0]) {
+        showToast('请选择文件', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    try {
+        const uploadRes = await fetch('/api/import/upload', {method: 'POST', body: formData});
+        const uploadData = await uploadRes.json();
+        if (!uploadData.success) { showToast(uploadData.error, 'error'); return; }
+
+        uploadedPath = uploadData.path;
+        const previewRes = await fetch('/api/import/preview', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({path: uploadedPath})
+        });
+        const previewData = await previewRes.json();
+        if (!previewData.success) { showToast(previewData.error, 'error'); return; }
+
+        uploadedSheets = previewData.sheets;
+        document.getElementById('previewArea').style.display = 'block';
+        document.getElementById('resultArea').style.display = 'none';
+
+        const pt = document.getElementById('previewTable');
+        pt.innerHTML = `
+            <p class="text-muted small mb-2">文件: ${escapeHtml(uploadData.filename)} · Sheet: ${escapeHtml(previewData.current_sheet)} · 共 ${previewData.total_rows} 行</p>
+            <table class="table table-sm table-bordered">
+                ${previewData.preview.map((row, idx) => `
+                    <tr${idx === 0 ? ' class="table-primary"' : ''}>
+                        ${row.map(c => `<td class="small">${escapeHtml(c)}</td>`).join('')}
+                    </tr>
+                `).join('')}
+            </table>
+        `;
+        showToast('预览已加载，请检查数据是否正确');
+
+    } catch (e) {
+        showToast('预览失败: ' + e.message, 'error');
+    }
+}
+
+async function executeImport() {
+    if (!uploadedPath) { showToast('请先上传文件', 'error'); return; }
+
+    const type = document.getElementById('importType').value;
+    document.getElementById('importProgress').textContent = '导入中，请稍候...';
+
+    try {
+        const res = await fetch('/api/import/execute', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({path: uploadedPath, table_type: type})
+        });
+        const data = await res.json();
+
+        document.getElementById('resultArea').style.display = 'block';
+        document.getElementById('importProgress').textContent = '';
+
+        if (data.success) {
+            document.getElementById('resultTitle').textContent = '✅ 导入完成';
+            document.getElementById('resultBody').innerHTML = `
+                <p>成功导入 <strong>${data.imported}</strong> 条记录</p>
+                ${(data.errors || []).length > 0 ? `
+                    <p class="text-warning">${data.errors.length} 条导入出错：</p>
+                    <ul class="small text-danger">
+                        ${data.errors.slice(0, 10).map(e => `<li>${escapeHtml(e)}</li>`).join('')}
+                    </ul>
+                ` : '<p class="text-success">全部导入成功 🎉</p>'}
+            `;
+            showToast('导入完成！');
+        } else {
+            document.getElementById('resultTitle').textContent = '❌ 导入失败';
+            document.getElementById('resultBody').innerHTML = `<p class="text-danger">${escapeHtml(data.error)}</p>`;
+        }
+    } catch (e) {
+        document.getElementById('importProgress').textContent = '';
+        showToast('导入失败: ' + e.message, 'error');
+    }
+}
+</script>
+</body>
+</html>
