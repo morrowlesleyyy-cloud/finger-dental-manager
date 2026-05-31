@@ -241,7 +241,7 @@ def api_dashboard():
 
 @app.route('/patients')
 def patients_page():
-    return render_template('patients.html')
+    return no_cache(render_template('base.html'))
 
 
 @app.route('/api/patients')
@@ -339,7 +339,7 @@ def api_delete_patient(pid):
 
 @app.route('/appointments')
 def appointments_page():
-    return render_template('appointments.html')
+    return no_cache(render_template('base.html'))
 
 
 @app.route('/api/appointments')
@@ -489,7 +489,7 @@ def api_delete_appointment(aid):
 
 @app.route('/transactions')
 def transactions_page():
-    return render_template('transactions.html')
+    return no_cache(render_template('base.html'))
 
 
 @app.route('/api/transactions')
@@ -624,7 +624,7 @@ def api_delete_transaction(tid):
 
 @app.route('/reports')
 def reports_page():
-    return render_template('reports.html')
+    return no_cache(render_template('base.html'))
 
 
 @app.route('/api/reports/overview')
@@ -690,7 +690,7 @@ def api_reports_overview():
 
 @app.route('/import')
 def import_page():
-    return render_template('import.html')
+    return no_cache(render_template('base.html'))
 
 
 @app.route('/api/import/upload', methods=['POST'])
