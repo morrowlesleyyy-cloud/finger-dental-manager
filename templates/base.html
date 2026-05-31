@@ -179,6 +179,9 @@
         <a class="nav-link" href="/import" data-page="import">
             <i class="bi bi-upload"></i> 数据导入
         </a>
+        <a class="nav-link" href="/employees" data-page="employees" id="navEmployees" style="display:none">
+            <i class="bi bi-person-gear"></i> 员工管理
+        </a>
     </nav>
 </div>
 
@@ -314,6 +317,7 @@ const PAGES = {
     transactions: { title: '成交管理', render: renderTransactions },
     reports: { title: '数据报表', render: renderReports },
     import: { title: '数据导入', render: renderImport },
+    employees: { title: '员工管理', render: renderEmployees },
 };
 
 function navigateTo(page) {
@@ -354,15 +358,22 @@ async function checkAuth() {
         const res = await fetch('/api/auth/check');
         const data = await res.json();
         if (data.logged_in) {
-            document.getElementById('userDisplay').textContent = '👤 ' + data.username;
+            const name = data.display_name || data.username;
+            document.getElementById('userDisplay').textContent = '👤 ' + name;
+            
+            // Show employee management link only for admin
+            if (data.permissions && data.permissions.is_admin) {
+                document.getElementById('navEmployees').style.display = '';
+            }
+            
+            // Update page routing to respect permissions
+            window.__permissions = data.permissions || {};
             return true;
         } else {
-            // Redirect to login
             window.location.href = '/login';
             return false;
         }
     } catch (e) {
-        console.log('Auth check failed, redirecting...');
         window.location.href = '/login';
         return false;
     }
@@ -1544,6 +1555,167 @@ async function executeImport() {
         showToast('导入失败: ' + e.message, 'error');
     }
 }
+
+// ===================== Employee Management =====================
+
+function renderEmployees() {
+    const body = document.getElementById('pageBody');
+    body.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0">👥 员工账号管理</h6>
+            <button class="btn btn-primary btn-sm" onclick="openEmployeeModal()">
+                <i class="bi bi-plus-lg"></i> 新增员工
+            </button>
+        </div>
+        <div class="chart-container p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>用户名</th><th>显示名称</th><th>角色</th><th>状态</th>
+                            <th>预约可见</th><th>成交可见</th><th>编辑患者</th><th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="empTableBody">
+                        <tr><td colspan="8" class="text-center py-4 text-muted">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    loadEmployees();
+}
+
+async function loadEmployees() {
+    const tbody = document.getElementById('empTableBody');
+    try {
+        const res = await fetch('/api/employees');
+        const data = await res.json();
+        if (data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">暂无员工账号</td></tr>';
+        } else {
+            tbody.innerHTML = data.data.map((e, i) => `
+                <tr>
+                    <td><strong>${escapeHtml(e.username)}</strong></td>
+                    <td>${escapeHtml(e.display_name) || '-'}</td>
+                    <td><span class="badge bg-${e.role === 'admin' ? 'danger' : 'primary'}">${e.role === 'admin' ? '管理员' : '员工'}</span></td>
+                    <td>${e.is_active ? '<span class="text-success">✅ 启用</span>' : '<span class="text-danger">⛔ 禁用</span>'}</td>
+                    <td>${e.can_view_appointments ? '✅' : '❌'}</td>
+                    <td>${e.can_view_transactions ? '✅' : '❌'}</td>
+                    <td>${e.can_edit_patients ? '✅' : '❌'}</td>
+                    <td>
+                        <button class="btn btn-outline-primary btn-sm py-0 me-1" onclick="openEmployeeModal(${e.id})"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-outline-danger btn-sm py-0" onclick="deleteEmployee(${e.id}, '${escapeHtml(e.username)}')"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">加载失败: ' + e.message + '</td></tr>';
+    }
+}
+
+async function openEmployeeModal(id) {
+    let empData = null;
+    if (id) {
+        const res = await fetch('/api/employees');
+        const data = await res.json();
+        empData = data.data.find(e => e.id === id);
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('formModal'));
+    document.getElementById('formModalLabel').textContent = empData ? '编辑员工' : '新增员工';
+    const form = document.getElementById('formBody');
+    form.innerHTML = `
+        <input type="hidden" id="formType" value="employee">
+        <input type="hidden" id="empId" value="${empData ? empData.id : ''}">
+        <div class="row g-3">
+            <div class="col-6">
+                <label class="form-label">用户名 *</label>
+                <input class="form-control" id="eUsername" value="${empData ? escapeHtml(empData.username) : ''}" ${empData ? 'readonly' : ''}>
+            </div>
+            <div class="col-6">
+                <label class="form-label">密码 ${empData ? '(留空不修改)' : '*'}</label>
+                <input class="form-control" type="password" id="ePassword" ${empData ? '' : 'required'}>
+            </div>
+            <div class="col-6">
+                <label class="form-label">显示名称</label>
+                <input class="form-control" id="eDisplayName" value="${empData ? escapeHtml(empData.display_name) : ''}">
+            </div>
+            <div class="col-6">
+                <label class="form-label">状态</label>
+                <select class="form-select" id="eStatus">
+                    <option value="true" ${empData && empData.is_active ? 'selected' : ''}>启用</option>
+                    <option value="false" ${empData && !empData.is_active ? 'selected' : ''}>禁用</option>
+                </select>
+            </div>
+            <div class="col-12"><hr><h6 class="fw-bold">🔐 权限设置</h6></div>
+            <div class="col-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="ePermAppt" ${!empData || empData.can_view_appointments ? 'checked' : ''}>
+                    <label class="form-check-label" for="ePermAppt">📅 预约可见</label>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="ePermTxn" ${!empData || empData.can_view_transactions ? 'checked' : ''}>
+                    <label class="form-check-label" for="ePermTxn">💰 成交可见</label>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="ePermEdit" ${!empData || empData.can_edit_patients ? 'checked' : ''}>
+                    <label class="form-check-label" for="ePermEdit">📝 编辑患者</label>
+                </div>
+            </div>
+        </div>
+    `;
+    modal.show();
+}
+
+async function saveEmployeeForm() {
+    const id = document.getElementById('empId').value;
+    const data = {
+        username: document.getElementById('eUsername').value.trim(),
+        password: document.getElementById('ePassword').value,
+        display_name: document.getElementById('eDisplayName').value.trim(),
+        is_active: document.getElementById('eStatus').value === 'true',
+        can_view_appointments: document.getElementById('ePermAppt').checked,
+        can_view_transactions: document.getElementById('ePermTxn').checked,
+        can_edit_patients: document.getElementById('ePermEdit').checked,
+    };
+    
+    if (!data.username) { showToast('请输入用户名', 'error'); return; }
+    if (!id && !data.password) { showToast('请输入密码', 'error'); return; }
+    
+    try {
+        const url = id ? '/api/employees/' + id : '/api/employees';
+        const method = id ? 'PUT' : 'POST';
+        // Don't send empty password on update
+        if (id && !data.password) delete data.password;
+        const res = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+        const result = await res.json();
+        if (result.success || result.data) {
+            showToast(id ? '员工已更新' : '员工已创建');
+            bootstrap.Modal.getInstance(document.getElementById('formModal')).hide();
+            loadEmployees();
+        } else {
+            showToast(result.error || '保存失败', 'error');
+        }
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+
+async function deleteEmployee(id, username) {
+    if (!confirm('确认删除员工 "' + username + '" 吗？')) return;
+    try {
+        const res = await fetch('/api/employees/' + id, {method: 'DELETE'});
+        const data = await res.json();
+        if (data.success) { showToast('已删除'); loadEmployees(); }
+    } catch (e) { showToast('删除失败', 'error'); }
+}
+
 </script>
 </body>
 </html>
