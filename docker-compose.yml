@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  dental-manager:
+    build: .
+    container_name: meya-dental-manager
+    ports:
+      - "8888:8888"
+    environment:
+      - PORT=8888
+      - RENDER=true
+      - SECRET_KEY=change-this-to-a-random-secret
+      - DATABASE_PATH=/app/data/clinic.db
+    volumes:
+      - dental_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  dental_data:

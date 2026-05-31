@@ -1,15 +1,22 @@
-"""Import all Excel data into the database."""
+"""Import all Excel data into the database.
+Avoids circular imports by importing models directly.
+"""
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app import app, db
-from models import Patient, Appointment, Transaction
 from datetime import datetime, date
 import openpyxl
 import re
 
-DATA_DIR = '/Users/meiya/.openclaw/workspace/数据表格'
+# Direct model imports (not from app, so no circular dependency)
+from models import db, Patient, Appointment, Transaction
+
+# Data files - look relative to script first, then fallback
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(_script_dir, 'data') if os.path.isdir(os.path.join(_script_dir, 'data')) \
+    else '/Users/meiya/.openclaw/workspace/数据表格'
+
 
 def parse_date(s):
     if not s or str(s).strip() == '':
@@ -18,12 +25,10 @@ def parse_date(s):
         return s if isinstance(s, date) else s.date()
     s = str(s).strip().replace('\xa0', ' ')
     
-    # Handle "5.31" format
     m = re.match(r'(\d{1,2})[./](\d{1,2})', s)
     if m:
         try:
             m_num, d_num = int(m.group(1)), int(m.group(2))
-            # If month > 12, it might be DD.MM
             if m_num > 12 and d_num <= 12:
                 m_num, d_num = d_num, m_num
             return date(2026, m_num, d_num)
@@ -37,6 +42,7 @@ def parse_date(s):
             continue
     return None
 
+
 def parse_float(s):
     if s is None or str(s).strip() == '':
         return 0.0
@@ -48,6 +54,7 @@ def parse_float(s):
     except:
         return 0.0
 
+
 def parse_int(s):
     if s is None or str(s).strip() == '':
         return 0
@@ -58,13 +65,14 @@ def parse_int(s):
     except:
         return 0
 
+
 def clean_name(name):
     if not name:
         return ''
     return str(name).replace('\xa0', ' ').strip()
 
+
 def import_performance(wb, sheet_name):
-    """Import performance data from a sheet."""
     ws = wb[sheet_name]
     headers = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
     
@@ -77,7 +85,6 @@ def import_performance(wb, sheet_name):
         if not patient_name or patient_name == 'None':
             continue
         
-        # Find or create patient
         patient = Patient.query.filter_by(name=patient_name).first()
         if not patient:
             patient = Patient(
@@ -88,7 +95,6 @@ def import_performance(wb, sheet_name):
             db.session.add(patient)
             db.session.flush()
         
-        # Create appointment record
         appt = Appointment(
             patient_id=patient.id,
             scheduled_date=parse_date(row_dict.get('日期', '')),
@@ -104,22 +110,15 @@ def import_performance(wb, sheet_name):
         )
         db.session.add(appt)
         
-        # Create transaction record
-        perf_amt = parse_float(row_dict.get('业绩金额(半款)', '0'))
-        paid_amt = parse_float(row_dict.get('已付金额(半款)', '0'))
-        deposit_amt = parse_float(row_dict.get('定金金额', '0'))
-        contract_amt = parse_float(row_dict.get('定金合同金额', '0'))
-        return_date = parse_date(row_dict.get('定金回款日期', ''))
-        
         txn = Transaction(
             patient_id=patient.id,
             plan_type=clean_name(row_dict.get('方案类型', '')),
-            performance_amount=perf_amt,
-            paid_amount=paid_amt,
+            performance_amount=parse_float(row_dict.get('业绩金额(半款)', '0')),
+            paid_amount=parse_float(row_dict.get('已付金额(半款)', '0')),
             payment_date=parse_date(row_dict.get('交款日期', '')),
-            deposit_amount=deposit_amt,
-            deposit_contract=contract_amt,
-            deposit_return_date=return_date,
+            deposit_amount=parse_float(row_dict.get('定金金额', '0')),
+            deposit_contract=parse_float(row_dict.get('定金合同金额', '0')),
+            deposit_return_date=parse_date(row_dict.get('定金回款日期', '')),
             consultant=clean_name(row_dict.get('咨询', '')),
         )
         db.session.add(txn)
@@ -127,15 +126,14 @@ def import_performance(wb, sheet_name):
     
     return imported
 
+
 def import_appointment(wb, sheet_name):
-    """Import appointment data from a sheet."""
     ws = wb[sheet_name]
     headers = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
     
     imported = 0
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         vals = [str(v) if v is not None else '' for v in row]
-        # Handle columns if sheet has 37 or 38 cols
         row_dict = dict(zip(headers, vals))
         
         patient_name = clean_name(row_dict.get('患者姓名', ''))
@@ -173,7 +171,6 @@ def import_appointment(wb, sheet_name):
         )
         db.session.add(appt)
         
-        # Transaction if present
         contract_amt = parse_float(row_dict.get('定金合同额', '0'))
         deposit_amt = parse_float(row_dict.get('定金额', '0'))
         perf_amt = parse_float(row_dict.get('成交额', '0'))
@@ -215,9 +212,15 @@ def import_appointment(wb, sheet_name):
     return imported
 
 
-def main():
-    with app.app_context():
+def import_from_files(flask_app=None):
+    """Import all Excel data. Can be called with or without flask_app param."""
+    ctx = flask_app.app_context() if flask_app else app.app_context()
+    with ctx:
         db.create_all()
+        
+        if Patient.query.count() > 0:
+            print('✅ Database already has data, skipping import')
+            return
         
         print("=" * 50)
         print("📥 开始导入接诊业绩数据...")
@@ -225,9 +228,10 @@ def main():
         wb = openpyxl.load_workbook(os.path.join(DATA_DIR, '接诊业绩数据.xlsx'), data_only=True)
         total_perf = 0
         for sheet in ['3月', '4月', '5月']:
-            count = import_performance(wb, sheet)
-            print(f"  {sheet}: {count} 条")
-            total_perf += count
+            if sheet in wb.sheetnames:
+                count = import_performance(wb, sheet)
+                print(f"  {sheet}: {count} 条")
+                total_perf += count
         
         print(f"\n📥 开始导入预约总表数据...")
         wb2 = openpyxl.load_workbook(os.path.join(DATA_DIR, '预约总表.xlsx'), data_only=True)
@@ -245,7 +249,6 @@ def main():
         print(f"   接诊业绩: {total_perf} 条记录")
         print(f"   预约总表: {total_appt} 条记录")
         
-        # Stats
         patients = Patient.query.count()
         appointments = Appointment.query.count()
         transactions = Transaction.query.count()
@@ -253,6 +256,11 @@ def main():
         print(f"   患者: {patients} 人")
         print(f"   预约: {appointments} 条")
         print(f"   交易: {transactions} 条")
+
+
+def main():
+    from app import app as flask_app
+    import_from_files(flask_app)
 
 if __name__ == '__main__':
     main()

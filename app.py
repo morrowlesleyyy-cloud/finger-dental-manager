@@ -14,8 +14,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'meya-dental-dev-key')
 
-# Database
-db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'clinic.db')
+# Database - support DATABASE_PATH env for Docker
+_env_db = os.environ.get('DATABASE_PATH')
+if _env_db:
+    db_path = _env_db
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+else:
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'clinic.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -914,6 +919,19 @@ def _parse_int(s):
 
 
 if __name__ == '__main__':
+    # Import data from Excel on first run if DB is empty
+    with app.app_context():
+        if Patient.query.count() == 0:
+            print('📥 Database empty, importing data from Excel...')
+            try:
+                import import_data
+                import_data.import_from_files(app)
+                print(f'✅ Import complete: {Patient.query.count()} patients')
+            except Exception as e:
+                import traceback
+                print(f'⚠️ Auto-import failed: {e}')
+                traceback.print_exc()
+
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
     host = '0.0.0.0' if os.environ.get('RENDER') else '127.0.0.1'

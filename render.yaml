@@ -1,18 +1,23 @@
-# Render Blueprint - MEYA Dental Management System
+# Render Blueprint - Docker Deployment
 # https://render.com/docs/blueprint-spec
 
 services:
   - type: web
     name: finger-dental-manager
-    runtime: python
+    runtime: docker
     region: singapore
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python3 app.py
+    dockerfilePath: ./Dockerfile
     envVars:
+      - key: PORT
+        value: "8888"
       - key: RENDER
         value: "true"
-      - key: PYTHON_VERSION
-        value: "3.11.0"
       - key: SECRET_KEY
         generateValue: true
+      - key: DATABASE_PATH
+        value: /var/data/clinic.db
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
