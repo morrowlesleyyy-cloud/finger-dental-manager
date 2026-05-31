@@ -143,6 +143,8 @@ def import_appointment(wb, sheet_name):
         phone = str(row_dict.get('电话号码', '') or '').replace('\xa0', '').strip()
         if phone == 'None':
             phone = ''
+        if phone and not phone.startswith('60'):
+            phone = '60' + phone
         
         patient = Patient.query.filter_by(name=patient_name).first()
         if not patient:
