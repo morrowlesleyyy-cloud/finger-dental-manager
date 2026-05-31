@@ -5,8 +5,9 @@ import json
 import uuid
 from datetime import datetime, date, timedelta
 from flask import (Flask, render_template, request, jsonify, redirect,
-                   url_for, flash, Response, send_from_directory)
+                   url_for, flash, Response, send_from_directory, session as flask_session)
 from sqlalchemy import func, extract, or_
+from functools import wraps
 
 # Add parent dir for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -27,6 +28,30 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 from models import db, Patient, Appointment, Transaction
 db.init_app(app)
 
+# =================== Auth Configuration ===================
+# Change these via environment variables
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+
+def login_required(f):
+    """Require valid session for route."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not flask_session.get('logged_in'):
+            # API routes return 401, page routes redirect
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'unauthorized'}), 401
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated
+
+def no_cache(response):
+    """Add headers to prevent caching of protected pages."""
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 # =================== SSE 客户端管理 ===================
 sse_clients = []
 
@@ -46,11 +71,49 @@ def sse_broadcast(event, data):
 with app.app_context():
     db.create_all()
 
+# =================== Auth Routes ===================
+
+@app.route('/login', methods=['GET'])
+def login_page():
+    if flask_session.get('logged_in'):
+        return redirect(url_for('index'))
+    return render_template('login.html')
+
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.get_json()
+    username = data.get('username', '')
+    password = data.get('password', '')
+    
+    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        flask_session['logged_in'] = True
+        flask_session['username'] = username
+        return jsonify({'success': True})
+    
+    return jsonify({'success': False, 'error': '用户名或密码错误'}), 401
+
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    flask_session.clear()
+    return jsonify({'success': True})
+
+
+@app.route('/api/auth/check')
+def api_auth_check():
+    return jsonify({
+        'logged_in': flask_session.get('logged_in', False),
+        'username': flask_session.get('username', ''),
+    })
+
+
 # =================== 主页 / Dashboard ===================
 
 @app.route('/')
+@login_required
 def index():
-    return render_template('base.html')
+    return no_cache(render_template('base.html'))
 
 
 @app.route('/api/dashboard')
@@ -159,6 +222,7 @@ def api_dashboard():
 # =================== 患者管理 ===================
 
 @app.route('/patients')
+@login_required
 def patients_page():
     return render_template('patients.html')
 
@@ -257,6 +321,7 @@ def api_delete_patient(pid):
 # =================== 预约管理 ===================
 
 @app.route('/appointments')
+@login_required
 def appointments_page():
     return render_template('appointments.html')
 
@@ -407,6 +472,7 @@ def api_delete_appointment(aid):
 # =================== 成交管理 ===================
 
 @app.route('/transactions')
+@login_required
 def transactions_page():
     return render_template('transactions.html')
 
@@ -542,6 +608,7 @@ def api_delete_transaction(tid):
 # =================== 报表 ===================
 
 @app.route('/reports')
+@login_required
 def reports_page():
     return render_template('reports.html')
 
@@ -608,6 +675,7 @@ def api_reports_overview():
 # =================== 数据导入 ===================
 
 @app.route('/import')
+@login_required
 def import_page():
     return render_template('import.html')
 
