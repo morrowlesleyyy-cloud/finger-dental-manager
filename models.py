@@ -101,6 +101,39 @@ class Appointment(db.Model):
         }
 
 
+class Employee(db.Model):
+    """员工账号"""
+    __tablename__ = 'employees'
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    password = db.Column(db.String(200), nullable=False)
+    display_name = db.Column(db.String(50), default='')
+    role = db.Column(db.String(20), default='staff')  # admin / staff
+
+    # Permissions
+    can_view_appointments = db.Column(db.Boolean, default=True)
+    can_view_transactions = db.Column(db.Boolean, default=True)
+    can_edit_patients = db.Column(db.Boolean, default=True)
+
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'display_name': self.display_name or '',
+            'role': self.role,
+            'can_view_appointments': bool(self.can_view_appointments),
+            'can_view_transactions': bool(self.can_view_transactions),
+            'can_edit_patients': bool(self.can_edit_patients),
+            'is_active': bool(self.is_active),
+            'created_at': self.created_at.strftime('%Y-%m-%d') if self.created_at else '',
+        }
+
+
 class Transaction(db.Model):
     """成交/财务记录"""
     __tablename__ = 'transactions'
