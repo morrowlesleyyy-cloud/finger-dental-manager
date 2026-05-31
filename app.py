@@ -918,19 +918,20 @@ def _parse_int(s):
         return 0
 
 
+# Auto-import on first run (runs at module load time for both dev and gunicorn)
+with app.app_context():
+    if Patient.query.count() == 0:
+        print('📥 Database empty, importing data from Excel...')
+        try:
+            import import_data
+            import_data.import_from_files(app)
+            print(f'✅ Import complete: {Patient.query.count()} patients')
+        except Exception as e:
+            import traceback
+            print(f'⚠️ Auto-import failed: {e}')
+            traceback.print_exc()
+
 if __name__ == '__main__':
-    # Import data from Excel on first run if DB is empty
-    with app.app_context():
-        if Patient.query.count() == 0:
-            print('📥 Database empty, importing data from Excel...')
-            try:
-                import import_data
-                import_data.import_from_files(app)
-                print(f'✅ Import complete: {Patient.query.count()} patients')
-            except Exception as e:
-                import traceback
-                print(f'⚠️ Auto-import failed: {e}')
-                traceback.print_exc()
 
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
