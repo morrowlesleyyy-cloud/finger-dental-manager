@@ -52,6 +52,25 @@ def no_cache(response):
     response.headers['Expires'] = '0'
     return response
 
+
+# Global auth check - protect all routes except login and static
+PUBLIC_PATHS = ['/login', '/api/login', '/api/logout', '/static/', '/api/auth/check']
+
+@app.before_request
+def check_global_auth():
+    if request.method == 'OPTIONS':
+        return None
+    path = request.path
+    # Allow public paths
+    for public in PUBLIC_PATHS:
+        if path == public or path.startswith(public):
+            return None
+    # Check session
+    if not flask_session.get('logged_in'):
+        if path.startswith('/api/'):
+            return jsonify({'error': 'unauthorized'}), 401
+        return redirect(url_for('login_page'))
+
 # =================== SSE 客户端管理 ===================
 sse_clients = []
 
@@ -111,7 +130,6 @@ def api_auth_check():
 # =================== 主页 / Dashboard ===================
 
 @app.route('/')
-@login_required
 def index():
     return no_cache(render_template('base.html'))
 
@@ -222,7 +240,6 @@ def api_dashboard():
 # =================== 患者管理 ===================
 
 @app.route('/patients')
-@login_required
 def patients_page():
     return render_template('patients.html')
 
@@ -321,7 +338,6 @@ def api_delete_patient(pid):
 # =================== 预约管理 ===================
 
 @app.route('/appointments')
-@login_required
 def appointments_page():
     return render_template('appointments.html')
 
@@ -472,7 +488,6 @@ def api_delete_appointment(aid):
 # =================== 成交管理 ===================
 
 @app.route('/transactions')
-@login_required
 def transactions_page():
     return render_template('transactions.html')
 
@@ -608,7 +623,6 @@ def api_delete_transaction(tid):
 # =================== 报表 ===================
 
 @app.route('/reports')
-@login_required
 def reports_page():
     return render_template('reports.html')
 
@@ -675,7 +689,6 @@ def api_reports_overview():
 # =================== 数据导入 ===================
 
 @app.route('/import')
-@login_required
 def import_page():
     return render_template('import.html')
 
