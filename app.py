@@ -170,24 +170,17 @@ def employees_page():
 
 @app.route('/api/employees')
 def api_list_employees():
-    err = require_admin()
-    if err:
-        return err
-    try:
-        employees = Employee.query.order_by(Employee.id).all()
-        return jsonify({'data': [e.to_dict() for e in employees]})
-    except Exception as e:
-        # Table might not exist yet, create it
-        db.create_all()
-        employees = Employee.query.order_by(Employee.id).all()
-        return jsonify({'data': [e.to_dict() for e in employees]})
+    # Admin check
+    if flask_session.get('user_role') != 'admin':
+        return jsonify({'error': 'forbidden', 'message': '仅管理员可执行此操作'}), 403
+    employees = Employee.query.order_by(Employee.id).all()
+    return jsonify({'data': [e.to_dict() for e in employees]})
 
 
 @app.route('/api/employees', methods=['POST'])
 def api_create_employee():
-    err = require_admin()
-    if err:
-        return err
+    if flask_session.get('user_role') != 'admin':
+        return jsonify({'error': 'forbidden', 'message': '仅管理员可执行此操作'}), 403
     data = request.get_json()
     username = data.get('username', '').strip()
     if not username:
@@ -215,9 +208,8 @@ def api_create_employee():
 
 @app.route('/api/employees/<int:eid>', methods=['PUT'])
 def api_update_employee(eid):
-    err = require_admin()
-    if err:
-        return err
+    if flask_session.get('user_role') != 'admin':
+        return jsonify({'error': 'forbidden', 'message': '仅管理员可执行此操作'}), 403
     emp = Employee.query.get_or_404(eid)
     data = request.get_json()
     
@@ -241,9 +233,8 @@ def api_update_employee(eid):
 
 @app.route('/api/employees/<int:eid>', methods=['DELETE'])
 def api_delete_employee(eid):
-    err = require_admin()
-    if err:
-        return err
+    if flask_session.get('user_role') != 'admin':
+        return jsonify({'error': 'forbidden', 'message': '仅管理员可执行此操作'}), 403
     emp = Employee.query.get_or_404(eid)
     db.session.delete(emp)
     db.session.commit()
