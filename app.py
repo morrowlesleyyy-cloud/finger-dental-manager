@@ -942,6 +942,39 @@ def sse_events():
     return Response(stream(), mimetype='text/event-stream')
 
 
+# =================== Debug ===================
+
+@app.route('/api/debug/employees')
+def api_debug_employees():
+    """Debug: check employees table."""
+    import traceback, sys
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        
+        # Try to fix tables
+        db.create_all()
+        
+        err_msg = None
+        emp_count = -1
+        try:
+            emp_count = Employee.query.count()
+        except Exception as e2:
+            err_msg = str(e2)
+        
+        return jsonify({
+            'tables': tables,
+            'employee_table_exists': 'employees' in tables,
+            'employee_count': emp_count,
+            'error': err_msg,
+            'permissions': flask_session.get('permissions', {}),
+            'role': flask_session.get('user_role', ''),
+        })
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 # =================== 搜索补全 ===================
 
 @app.route('/api/search/patients')
