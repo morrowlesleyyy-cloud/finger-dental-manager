@@ -1238,6 +1238,21 @@ def health_page():
     return api_health()
 
 
+@app.route('/api/fix/phones')
+def api_fix_phones():
+    """One-time: add 60 prefix to all patient phone numbers."""
+    if flask_session.get('user_role') != 'admin':
+        return jsonify({'error': 'forbidden'}), 403
+    updated = 0
+    for p in Patient.query.filter(Patient.phone != '', Patient.phone.isnot(None)).all():
+        phone = p.phone.strip()
+        if phone and not phone.startswith('60'):
+            p.phone = '60' + phone
+            updated += 1
+    db.session.commit()
+    return jsonify({'success': True, 'updated': updated})
+
+
 def _parse_float(s):
     if not s or s == '' or s == 'None':
         return 0.0
