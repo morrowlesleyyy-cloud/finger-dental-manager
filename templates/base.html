@@ -1014,8 +1014,7 @@ async function loadAppointments() {
 }
 
 function openAppointmentModal(id) {
-    // Fetch detail if id provided
-    const fetchData = id ? fetch('/api/appointments?per_page=1').then(r => r.json()).then(d => d.data.find(a => a.id === id)) : Promise.resolve(null);
+    const fetchData = id ? fetch(`/api/appointments/${id}`).then(r => r.json()).then(d => d.data) : Promise.resolve(null);
     fetchData.then(appt => {
         const modal = new bootstrap.Modal(document.getElementById('formModal'));
         document.getElementById('formModalLabel').textContent = appt ? '编辑预约' : '新建预约';

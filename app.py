@@ -642,6 +642,13 @@ def api_create_appointment():
     return jsonify({'success': True, 'data': a.to_dict()})
 
 
+@app.route('/api/appointments/<int:aid>')
+def api_get_appointment(aid):
+    """Get a single appointment by ID."""
+    a = Appointment.query.get_or_404(aid)
+    return jsonify({'success': True, 'data': a.to_dict()})
+
+
 @app.route('/api/appointments/<int:aid>', methods=['PUT'])
 def api_update_appointment(aid):
     a = Appointment.query.get_or_404(aid)
