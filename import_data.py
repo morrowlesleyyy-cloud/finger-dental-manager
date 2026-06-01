@@ -85,8 +85,8 @@ def import_performance(wb, sheet_name):
         if not patient_name or patient_name == 'None':
             continue
         
-        phone = str(row_dict.get('电话号码', '') or '').strip()
-        if phone == 'None' or phone == '':
+        phone = (str(row_dict.get('电话号码', '') or '').strip() or None)
+        if phone == 'None' or not phone:
             phone = ''
         patient = None
         if phone:

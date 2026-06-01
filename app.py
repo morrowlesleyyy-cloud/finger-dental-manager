@@ -55,7 +55,9 @@ def login_required(f):
 
 def normalize_phone(phone):
     """Ensure phone starts with '60' (Malaysia country code)."""
-    if phone and not phone.startswith('60'):
+    if not phone:
+        return None
+    if not phone.startswith('60'):
         return '60' + phone
     return phone
 
@@ -418,7 +420,7 @@ def api_patient_detail(pid):
 @app.route('/api/patients', methods=['POST'])
 def api_create_patient():
     data = request.get_json()
-    phone = normalize_phone(data.get('phone', ''))
+    phone = normalize_phone(data.get('phone', '')) or None
 
     # 按电话号码查找重复患者
     existing = None
@@ -581,7 +583,7 @@ def api_create_appointment():
 
     # 如果没传 patient_id，按电话/内部编号/姓名查找或创建患者
     if not patient_id:
-        phone = normalize_phone(data.get('phone', ''))
+        phone = normalize_phone(data.get('phone', '')) or None
         internal_id = data.get('internal_id', '').strip()
         name = data.get('patient_name', '').strip()
 
@@ -717,7 +719,7 @@ def api_create_transaction():
     patient_id = data.get('patient_id')
 
     if not patient_id:
-        phone = normalize_phone(data.get('phone', ''))
+        phone = normalize_phone(data.get('phone', '')) or None
         internal_id = data.get('internal_id', '').strip()
         name = data.get('patient_name', '').strip()
 
@@ -1094,7 +1096,7 @@ def _import_appointment_row(row):
     if not patient_name or patient_name == 'None':
         return
 
-    phone = str(row.get('电话号码', '') or '').strip().replace('\xa0', '')
+    phone = (str(row.get('电话号码', '') or '').strip().replace('\xa0', '') or None)
     if phone == 'None' or phone == '':
         phone = ''
 
@@ -1178,7 +1180,7 @@ def _import_performance_row(row):
     if not patient_name or patient_name == 'None':
         return
 
-    phone = str(row.get('电话号码', '') or '').strip().replace('\xa0', '')
+    phone = (str(row.get('电话号码', '') or '').strip().replace('\xa0', '') or None)
     if phone == 'None' or phone == '':
         phone = ''
 
