@@ -1266,6 +1266,45 @@ def ensure_initialized():
             pass
         
         db.create_all()
+
+        # ===== Migration: add internal_id column if missing in existing DB =====
+        from sqlalchemy import inspect as sa_inspect
+        inspector = sa_inspect(db.engine)
+        cols = [c['name'] for c in inspector.get_columns('patients')]
+        if 'internal_id' not in cols:
+            try:
+                db.session.execute(sa_text('ALTER TABLE patients ADD COLUMN internal_id VARCHAR(20)'))
+                db.session.commit()
+                print('📌 Added internal_id column')
+            except Exception:
+                db.session.rollback()
+
+        # Generate internal_id for existing patients
+        missing = Patient.query.filter(Patient.internal_id.is_(None)).all()
+        for p in missing:
+            p.internal_id = f'MEYA-{p.id:04d}'
+        if missing:
+            db.session.commit()
+            print(f'📌 Generated internal_id for {len(missing)} patients')
+
+        # Handle duplicate phone numbers (remove unique constraint is complex,
+        # instead just dedupe on the fly)
+        dupe_phones = db.session.query(
+            Patient.phone, db.func.count(Patient.id)
+        ).filter(
+            Patient.phone != '', Patient.phone.isnot(None)
+        ).group_by(Patient.phone).having(db.func.count(Patient.id) > 1).all()
+        for phone, cnt in dupe_phones:
+            patients = Patient.query.filter_by(phone=phone).order_by(Patient.id).all()
+            keep = patients[0]
+            for dup in patients[1:]:
+                # Merge appointments and transactions to the kept patient
+                Appointment.query.filter_by(patient_id=dup.id).update({'patient_id': keep.id})
+                Transaction.query.filter_by(patient_id=dup.id).update({'patient_id': keep.id})
+                db.session.delete(dup)
+            print(f'📌 Merged {cnt-1} duplicate(s) for phone {phone}')
+        if dupe_phones:
+            db.session.commit()
         
         # Import data if empty
         if Patient.query.count() == 0:
