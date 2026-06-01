@@ -104,8 +104,19 @@ def import_performance(wb, sheet_name):
                 online_consultant=clean_name(row_dict.get('网咨', '')),
                 condition_desc=row_dict.get('患者情况', ''),
             )
-            db.session.add(patient)
-            db.session.flush()
+            try:
+                db.session.add(patient)
+                db.session.flush()
+            except Exception:
+                db.session.rollback()
+                # Duplicate found - find existing patient
+                if patient_name:
+                    patient = Patient.query.filter_by(name=patient_name).first()
+                if not patient and phone:
+                    patient = Patient.query.filter_by(phone=phone).first()
+                if not patient:
+                    print(f'⚠️ Skipping duplicate: {patient_name}')
+                    continue
         
         appt = Appointment(
             patient_id=patient.id,

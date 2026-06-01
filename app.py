@@ -1326,7 +1326,11 @@ def ensure_initialized():
         if dupe_phones:
             db.session.commit()
         
-        # Import data if empty
+        # Import data if empty (rollback any pending failed ops first)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
         if Patient.query.count() == 0:
             print('📥 Auto-importing Excel data...')
             import import_data
