@@ -85,10 +85,22 @@ def import_performance(wb, sheet_name):
         if not patient_name or patient_name == 'None':
             continue
         
-        patient = Patient.query.filter_by(name=patient_name).first()
+        phone = str(row_dict.get('电话号码', '') or '').strip()
+        if phone == 'None' or phone == '':
+            phone = ''
+        patient = None
+        if phone:
+            patient = Patient.query.filter_by(phone=phone).first()
+        if not patient and patient_name:
+            patient = Patient.query.filter_by(name=patient_name).first()
         if not patient:
+            last = Patient.query.order_by(Patient.id.desc()).first()
+            next_num = (last.id + 1) if last else 1
+            internal_id = f'MEYA-{next_num:04d}'
             patient = Patient(
+                internal_id=internal_id,
                 name=patient_name,
+                phone=phone,
                 online_consultant=clean_name(row_dict.get('网咨', '')),
                 condition_desc=row_dict.get('患者情况', ''),
             )
@@ -146,9 +158,17 @@ def import_appointment(wb, sheet_name):
         if phone and not phone.startswith('60'):
             phone = '60' + phone
         
-        patient = Patient.query.filter_by(name=patient_name).first()
+        patient = None
+        if phone:
+            patient = Patient.query.filter_by(phone=phone).first()
+        if not patient and patient_name:
+            patient = Patient.query.filter_by(name=patient_name).first()
         if not patient:
+            last = Patient.query.order_by(Patient.id.desc()).first()
+            next_num = (last.id + 1) if last else 1
+            internal_id = f'MEYA-{next_num:04d}'
             patient = Patient(
+                internal_id=internal_id,
                 name=patient_name,
                 phone=phone,
                 tooth_count=clean_name(row_dict.get('缺牙颗数', '')),
