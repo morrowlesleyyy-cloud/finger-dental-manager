@@ -262,8 +262,16 @@ def index():
 
 @app.route('/api/dashboard')
 def api_dashboard():
+    # Auto-detect latest month with transaction data, fallback to current month
+    latest_txn = Transaction.query.filter(
+        Transaction.payment_date.isnot(None)
+    ).order_by(Transaction.payment_date.desc()).first()
+    if latest_txn and latest_txn.payment_date:
+        ref_date = latest_txn.payment_date
+    else:
+        ref_date = date.today()
     today = date.today()
-    month_start = date(today.year, today.month, 1)
+    month_start = date(ref_date.year, ref_date.month, 1)
 
     # 今日预约数
     today_appointments = Appointment.query.filter(
@@ -315,9 +323,12 @@ def api_dashboard():
     ).count()
 
     # 本月业绩趋势（按天）
+    import calendar
+    days_in_month = calendar.monthrange(ref_date.year, ref_date.month)[1]
+    days_to_show = days_in_month if ref_date != date.today() else min(days_in_month, today.day)
     revenue_trend = []
-    for i in range(min(31, today.day)):
-        d = date(today.year, today.month, i + 1)
+    for i in range(days_to_show):
+        d = date(ref_date.year, ref_date.month, i + 1)
         day_total = db.session.query(func.sum(Transaction.performance_amount)).filter(
             Transaction.payment_date == d
         ).scalar() or 0
