@@ -380,6 +380,7 @@ def api_patients():
             or_(
                 Patient.name.contains(search),
                 Patient.phone.contains(search),
+                Patient.internal_id.contains(search),
                 Patient.online_consultant.contains(search)
             )
         )
@@ -417,9 +418,42 @@ def api_patient_detail(pid):
 @app.route('/api/patients', methods=['POST'])
 def api_create_patient():
     data = request.get_json()
+    phone = normalize_phone(data.get('phone', ''))
+
+    # 按电话号码查找重复患者
+    existing = None
+    if phone:
+        existing = Patient.query.filter_by(phone=phone).first()
+    if not existing:
+        internal_id = data.get('internal_id', '').strip()
+        if internal_id:
+            existing = Patient.query.filter_by(internal_id=internal_id).first()
+
+    if existing:
+        # 合并：更新现有患者的信息
+        for field in ['name', 'gender', 'tooth_count', 'condition_desc',
+                      'source', 'source_channel', 'online_consultant']:
+            val = data.get(field)
+            if val:
+                setattr(existing, field, val)
+        if 'age' in data and data['age']:
+            existing.age = int(data['age'])
+        existing.updated_at = datetime.now()
+        db.session.commit()
+        sse_broadcast('patient_updated', existing.to_dict())
+        return jsonify({'success': True, 'merged': True, 'data': existing.to_dict()})
+
+    # 自动生成内部编号
+    internal_id = data.get('internal_id', '').strip()
+    if not internal_id:
+        last = Patient.query.order_by(Patient.id.desc()).first()
+        next_num = (last.id + 1) if last else 1
+        internal_id = f'MEYA-{next_num:04d}'
+
     p = Patient(
+        internal_id=internal_id,
         name=data.get('name', ''),
-        phone=normalize_phone(data.get('phone', '')),
+        phone=phone,
         gender=data.get('gender', ''),
         age=data.get('age', 0, type=int),
         tooth_count=data.get('tooth_count', ''),
@@ -431,7 +465,7 @@ def api_create_patient():
     db.session.add(p)
     db.session.commit()
     sse_broadcast('patient_created', p.to_dict())
-    return jsonify({'success': True, 'data': p.to_dict()})
+    return jsonify({'success': True, 'merged': False, 'data': p.to_dict()})
 
 
 @app.route('/api/patients/<int:pid>', methods=['PUT'])
@@ -439,7 +473,7 @@ def api_update_patient(pid):
     p = Patient.query.get_or_404(pid)
     data = request.get_json()
     for field in ['name', 'phone', 'gender', 'tooth_count', 'condition_desc',
-                  'source', 'source_channel', 'online_consultant']:
+                  'source', 'source_channel', 'online_consultant', 'internal_id']:
         if field in data:
             setattr(p, field, data[field])
     if 'age' in data and data['age']:
@@ -483,6 +517,8 @@ def api_appointments():
         query = query.join(Patient).filter(
             or_(
                 Patient.name.contains(search),
+                Patient.phone.contains(search),
+                Patient.internal_id.contains(search),
                 Appointment.inviter.contains(search),
                 Appointment.phone.contains(search),
             )
@@ -543,19 +579,30 @@ def api_create_appointment():
     data = request.get_json()
     patient_id = data.get('patient_id')
 
-    # 如果没传 patient_id，尝试查找或创建患者
+    # 如果没传 patient_id，按电话/内部编号/姓名查找或创建患者
     if not patient_id:
+        phone = normalize_phone(data.get('phone', ''))
+        internal_id = data.get('internal_id', '').strip()
         name = data.get('patient_name', '').strip()
-        phone = data.get('phone', '').strip()
-        if name:
+
+        patient = None
+        if phone:
+            patient = Patient.query.filter_by(phone=phone).first()
+        if not patient and internal_id:
+            patient = Patient.query.filter_by(internal_id=internal_id).first()
+        if not patient and name:
             patient = Patient.query.filter_by(name=name).first()
-            if not patient:
-                patient = Patient(name=name, phone=phone)
-                db.session.add(patient)
-                db.session.flush()
-            patient_id = patient.id
-        else:
-            return jsonify({'success': False, 'error': '请指定患者'}), 400
+
+        if not patient:
+            if not phone and not internal_id and not name:
+                return jsonify({'success': False, 'error': '请提供患者信息（姓名/电话/编号）'}), 400
+            last = Patient.query.order_by(Patient.id.desc()).first()
+            next_num = (last.id + 1) if last else 1
+            internal_id = internal_id or f'MEYA-{next_num:04d}'
+            patient = Patient(internal_id=internal_id, name=name, phone=phone)
+            db.session.add(patient)
+            db.session.flush()
+        patient_id = patient.id
 
     a = Appointment(
         patient_id=patient_id,
@@ -670,16 +717,35 @@ def api_create_transaction():
     patient_id = data.get('patient_id')
 
     if not patient_id:
+        phone = normalize_phone(data.get('phone', ''))
+        internal_id = data.get('internal_id', '').strip()
         name = data.get('patient_name', '').strip()
-        if name:
+
+        # 优先按电话号码查找，其次内部编号，最后姓名
+        patient = None
+        if phone:
+            patient = Patient.query.filter_by(phone=phone).first()
+        if not patient and internal_id:
+            patient = Patient.query.filter_by(internal_id=internal_id).first()
+        if not patient and name:
             patient = Patient.query.filter_by(name=name).first()
-            if not patient:
-                patient = Patient(name=name, phone=normalize_phone(data.get('phone', '')))
-                db.session.add(patient)
-                db.session.flush()
-            patient_id = patient.id
-        else:
-            return jsonify({'success': False, 'error': '请指定患者'}), 400
+
+        if not patient:
+            # 无任何标识信息，无法创建患者
+            if not phone and not internal_id and not name:
+                return jsonify({'success': False, 'error': '请提供患者信息（姓名/电话/编号）'}), 400
+            # 自动生成内部编号
+            last = Patient.query.order_by(Patient.id.desc()).first()
+            next_num = (last.id + 1) if last else 1
+            internal_id = internal_id or f'MEYA-{next_num:04d}'
+            patient = Patient(
+                internal_id=internal_id,
+                name=name,
+                phone=phone,
+            )
+            db.session.add(patient)
+            db.session.flush()
+        patient_id = patient.id
 
     t = Transaction(
         patient_id=patient_id,
@@ -987,9 +1053,13 @@ def api_search_patients():
         or_(
             Patient.name.contains(q),
             Patient.phone.contains(q),
+            Patient.internal_id.contains(q),
         )
     ).limit(10).all()
-    return jsonify([{'id': p.id, 'name': p.name, 'phone': p.phone or ''} for p in results])
+    return jsonify([{
+        'id': p.id, 'name': p.name, 'phone': p.phone or '',
+        'internal_id': p.internal_id or ''
+    } for p in results])
 
 
 # =================== 工具函数 ===================
@@ -1028,8 +1098,12 @@ def _import_appointment_row(row):
     if phone == 'None' or phone == '':
         phone = ''
 
-    # 查找或创建患者
-    patient = Patient.query.filter_by(name=patient_name).first()
+    # 查找或创建患者: 优先按电话查找，其次姓名
+    patient = None
+    if phone:
+        patient = Patient.query.filter_by(phone=phone).first()
+    if not patient and patient_name:
+        patient = Patient.query.filter_by(name=patient_name).first()
     if not patient:
         patient = Patient(
             name=patient_name,

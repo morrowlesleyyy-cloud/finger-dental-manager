@@ -664,7 +664,7 @@ function renderPatients() {
                         </tr>
                     </thead>
                     <tbody id="patientTableBody">
-                        <tr><td colspan="7" class="text-center py-4 text-muted">加载中...</td></tr>
+                        <tr><td colspan="8" class="text-center py-4 text-muted">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -704,6 +704,7 @@ async function loadPatients() {
             tbody.innerHTML = data.data.map(p => `
                 <tr onclick="openPatientDetail(${p.id})">
                     <td><strong>${escapeHtml(p.name)}</strong></td>
+                    <td class="small text-muted">${escapeHtml(p.internal_id) || '-'}</td>
                     <td>${escapeHtml(p.phone) || '-'}</td>
                     <td>${escapeHtml(p.tooth_count) || '-'}</td>
                     <td>${escapeHtml(p.source) || '-'}</td>
@@ -739,6 +740,7 @@ function openPatientDetail(pid) {
         document.getElementById('detailModalBody').innerHTML = `
             <div class="row g-3">
                 <div class="col-6"><label class="form-label">电话</label><p class="fw-bold">${escapeHtml(p.phone) || '-'}</p></div>
+                <div class="col-6"><label class="form-label">内部编号</label><p class="fw-bold">${escapeHtml(p.internal_id) || '-'}</p></div>
                 <div class="col-6"><label class="form-label">性别</label><p>${escapeHtml(p.gender) || '-'}</p></div>
                 <div class="col-6"><label class="form-label">年龄</label><p>${p.age || '-'}</p></div>
                 <div class="col-6"><label class="form-label">缺牙颗数</label><p>${escapeHtml(p.tooth_count) || '-'}</p></div>
@@ -1194,7 +1196,13 @@ function openTransactionModal(id) {
             <input type="hidden" id="txnId" value="${txn ? txn.id : ''}">
             <div class="row g-3">
                 <div class="col-6"><label class="form-label">患者 *</label>
-                    <input class="form-control" id="tPatientName" value="${txn ? escapeHtml(txn.patient_name) : ''}" placeholder="输入患者名"></div>
+                    <input class="form-control" id="tPatientName" list="txnPatientList" value="${txn ? escapeHtml(txn.patient_name) : ''}" placeholder="输入患者名/电话/编号"></div>
+                <div class="col-md-3">
+                    <label class="form-label">患者电话</label>
+                    <input class="form-control" id="tPatientPhone" value="${txn ? escapeHtml(txn.patient_phone) : ''}" placeholder="自动填写" readonly></div>
+                <div class="col-md-3">
+                    <label class="form-label">内部编号</label>
+                    <input class="form-control" id="tPatientInternalId" value="${txn ? escapeHtml(txn.patient_internal_id) : ''}" placeholder="自动填写" readonly></div>
                 <div class="col-6"><label class="form-label">咨询师</label>
                     <input class="form-control" id="tConsultant" value="${txn ? escapeHtml(txn.consultant) : ''}"></div>
                 <div class="col-4"><label class="form-label">方案类型</label>
@@ -1234,6 +1242,8 @@ function openTransactionModal(id) {
 async function saveTransactionForm() {
     const data = {
         patient_name: document.getElementById('tPatientName').value.trim(),
+        phone: document.getElementById('tPatientPhone').value.trim(),
+        internal_id: document.getElementById('tPatientInternalId').value.trim(),
         consultant: document.getElementById('tConsultant').value.trim(),
         plan_type: document.getElementById('tPlanType').value,
         visit_outcome: document.getElementById('tOutcome').value,

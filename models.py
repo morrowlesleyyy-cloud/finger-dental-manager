@@ -10,8 +10,9 @@ class Patient(db.Model):
     __tablename__ = 'patients'
 
     id = db.Column(db.Integer, primary_key=True)
+    internal_id = db.Column(db.String(20), unique=True, index=True)  # 内部编号: MEYA-0001
     name = db.Column(db.String(100), nullable=False, index=True)
-    phone = db.Column(db.String(50), index=True)
+    phone = db.Column(db.String(50), unique=True, index=True)  # 电话号码作为唯一标识
     gender = db.Column(db.String(10))
     age = db.Column(db.Integer)
     tooth_count = db.Column(db.String(50))  # 缺牙颗数: 少颗/多颗/半口/全口
@@ -34,6 +35,7 @@ class Patient(db.Model):
             phone = '60' + phone
         return {
             'id': self.id,
+            'internal_id': self.internal_id or '',
             'name': self.name,
             'phone': phone,
             'gender': self.gender,
@@ -80,10 +82,16 @@ class Appointment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
 
     def to_dict(self):
+        pat = self.patient
+        pat_name = pat.name if pat else ''
+        pat_phone = (pat.phone or '') if pat else ''
+        pat_internal = (pat.internal_id or '') if pat else ''
         return {
             'id': self.id,
             'patient_id': self.patient_id,
-            'patient_name': self.patient.name if self.patient else '',
+            'patient_name': pat_name,
+            'patient_phone': pat_phone,
+            'patient_internal_id': pat_internal,
             'scheduled_date': self.scheduled_date.strftime('%Y-%m-%d') if self.scheduled_date else '',
             'scheduled_time': self.scheduled_time or '',
             'inviter': self.inviter or '',
@@ -183,10 +191,16 @@ class Transaction(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
 
     def to_dict(self):
+        pat = self.patient
+        pat_name = pat.name if pat else ''
+        pat_phone = (pat.phone or '') if pat else ''
+        pat_internal = (pat.internal_id or '') if pat else ''
         return {
             'id': self.id,
             'patient_id': self.patient_id,
-            'patient_name': self.patient.name if self.patient else '',
+            'patient_name': pat_name,
+            'patient_phone': pat_phone,
+            'patient_internal_id': pat_internal,
             'plan_type': self.plan_type or '',
             'plan_detail': self.plan_detail or '',
             'brand': self.brand or '',
