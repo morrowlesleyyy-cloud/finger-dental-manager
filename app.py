@@ -1151,52 +1151,24 @@ def _import_performance_row(row):
 # we initialize on the first request. This eliminates 502 errors.
 
 _app_initialized = False
-_app_initing = False
 _init_error = None
 
-def _cleanup_stale_db_files():
-    """Remove stale SQLite WAL/SHM files from an unclean shutdown.
-    
-    On Render's ephemeral filesystem, -wal/-shm files can persist
-    briefly between deployments, causing 'database is locked' when
-    the new process tries PRAGMA journal_mode=WAL.
-    """
-    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'clinic.db')
-    for ext in ('-wal', '-shm'):
-        path = base + ext
-        try:
-            if os.path.exists(path):
-                os.remove(path)
-                print(f'🗑️ Removed stale lock file: {path}')
-        except (OSError, PermissionError) as e:
-            print(f'⚠️ Could not remove {path}: {e}')
-
 def ensure_initialized():
-    """Run once on first request. Creates tables + imports data if needed."""
+    """Run on first request. Creates tables + imports if needed."""
     global _app_initialized, _init_error
     if _app_initialized:
         return True
     
     try:
-        # Clean up stale WAL/SHM files from previous deployments
-        _cleanup_stale_db_files()
-        
-        # Enable WAL mode for SQLite (retry with backoff)
         from sqlalchemy import text as sa_text
-        from time import sleep
-        for attempt in range(3):
-            try:
-                db.session.execute(sa_text('PRAGMA journal_mode=WAL'))
-                db.session.execute(sa_text('PRAGMA synchronous=NORMAL'))
-                db.session.commit()
-                break
-            except Exception as e:
-                db.session.rollback()
-                if attempt < 2:
-                    print(f'📌 PRAGMA attempt {attempt+1} failed, retrying: {e}')
-                    sleep(1)
-                else:
-                    raise
+        
+        # Try WAL mode; non-fatal if locked (database works without it)
+        try:
+            db.session.execute(sa_text('PRAGMA journal_mode=WAL'))
+            db.session.execute(sa_text('PRAGMA synchronous=NORMAL'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         
         # Create employees table if not exists
         try:
@@ -1243,17 +1215,10 @@ def ensure_initialized():
 def check_initialized():
     """Ensure app is initialized before handling any request."""
     if request.path in ['/api/health', '/health']:
-        return None  # Health check doesn't need init
+        return None
     if request.path.startswith('/static/'):
         return None
     if not _app_initialized:
-        # Avoid concurrent init from multiple requests
-        global _app_initing
-        if _app_initing:
-            return jsonify({
-                'error': 'initializing',
-                'message': '服务启动中，请稍候...'
-            }), 503
         with app.app_context():
             ok = ensure_initialized()
         if not ok:
@@ -1314,23 +1279,7 @@ def _parse_int(s):
         return 0
 
 
-# Start initialization in background thread so server is immediately responsive
-import threading
-import time
-
-def _run_init():
-    global _app_initing
-    _app_initing = True
-    with app.app_context():
-        ok = ensure_initialized()
-    _app_initing = False
-    if ok:
-        print('✅ App initialized successfully')
-    else:
-        print(f'⚠️ App init failed (will retry on first request): {_init_error}')
-
-t = threading.Thread(target=_run_init, daemon=True)
-t.start()
+# Initialization happens on first request (see check_initialized above)
 
 if __name__ == '__main__':
 
