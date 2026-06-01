@@ -87,7 +87,7 @@ def import_performance(wb, sheet_name):
         
         phone = (str(row_dict.get('电话号码', '') or '').strip() or None)
         if phone == 'None' or not phone:
-            phone = ''
+            phone = None
         patient = None
         if phone:
             patient = Patient.query.filter_by(phone=phone).first()
@@ -153,8 +153,8 @@ def import_appointment(wb, sheet_name):
             continue
         
         phone = str(row_dict.get('电话号码', '') or '').replace('\xa0', '').strip()
-        if phone == 'None':
-            phone = ''
+        if phone == 'None' or not phone:
+            phone = None
         if phone and not phone.startswith('60'):
             phone = '60' + phone
         

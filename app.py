@@ -1097,8 +1097,8 @@ def _import_appointment_row(row):
         return
 
     phone = (str(row.get('电话号码', '') or '').strip().replace('\xa0', '') or None)
-    if phone == 'None' or phone == '':
-        phone = ''
+    if phone == 'None' or not phone:
+        phone = None
 
     # 查找或创建患者: 优先按电话查找，其次姓名
     patient = None
