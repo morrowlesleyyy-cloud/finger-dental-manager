@@ -584,10 +584,19 @@ async function renderDashboard() {
             </div>
         `;
 
-        // Render Chart
-        setTimeout(() => {
-            const ctx = document.getElementById('revenueChart').getContext('2d');
-            new Chart(ctx, {
+        // Render Chart (debounced to avoid stacking from rapid SSE triggers)
+        if (window._revenueTimer) clearTimeout(window._revenueTimer);
+        if (window._revenueChart) {
+            window._revenueChart.destroy();
+            window._revenueChart = null;
+        }
+        window._revenueTimer = setTimeout(() => {
+            const canvas = document.getElementById('revenueChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.style.width = '100%';
+            canvas.style.maxHeight = '280px';
+            window._revenueChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: data.revenue_trend.map(d => d.date),
@@ -610,6 +619,13 @@ async function renderDashboard() {
                         y: {
                             beginAtZero: true,
                             ticks: { callback: v => 'RM ' + v.toLocaleString() }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                autoSkip: true,
+                                maxTicksLimit: 15
+                            }
                         }
                     }
                 }
@@ -1388,10 +1404,11 @@ async function loadReports() {
         }
 
         // Source chart
+        if (window._sourceChart) window._sourceChart.destroy();
         setTimeout(() => {
             const ctx2 = document.getElementById('sourceChart');
             if (!ctx2) return;
-            new Chart(ctx2, {
+            window._sourceChart = new Chart(ctx2, {
                 type: 'doughnut',
                 data: {
                     labels: data.source_analysis.map(s => s.name || '未知'),
@@ -1405,10 +1422,11 @@ async function loadReports() {
         }, 100);
 
         // Visit chart
+        if (window._visitChart) window._visitChart.destroy();
         setTimeout(() => {
             const ctx3 = document.getElementById('visitChart');
             if (!ctx3) return;
-            new Chart(ctx3, {
+            window._visitChart = new Chart(ctx3, {
                 type: 'doughnut',
                 data: {
                     labels: data.visit_analysis.map(s => s.name || '未知'),
