@@ -20,6 +20,11 @@ class Patient(db.Model):
     source = db.Column(db.String(50))        # 客户来源: 网咨/转介绍/自然到店
     source_channel = db.Column(db.String(50)) # 线索来源渠道: FB/转介绍等
     online_consultant = db.Column(db.String(50))  # 网咨
+
+    __table_args__ = (
+        db.Index('idx_patient_online_consultant', 'online_consultant'),
+    )
+
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
@@ -85,6 +90,14 @@ class Appointment(db.Model):
     treatment_project = db.Column(db.String(200)) # 治疗项目
     total_fee = db.Column(db.Float, default=0)    # 总费用
     paid_fee = db.Column(db.Float, default=0)     # 已交费用
+
+    __table_args__ = (
+        db.Index('idx_appt_patient_id', 'patient_id'),
+        db.Index('idx_appt_scheduled_date', 'scheduled_date'),
+        db.Index('idx_appt_visit_type', 'visit_type'),
+        db.Index('idx_appt_inviter', 'inviter'),
+        db.Index('idx_appt_actual_visit', 'actual_visit'),
+    )
 
     created_at = db.Column(db.DateTime, default=datetime.now)
 
@@ -211,6 +224,12 @@ class Transaction(db.Model):
     # 成交分类
     visit_outcome = db.Column(db.String(50))   # 成交类型: 成交/定金/定金转成交/未成交转成交等
     consultant = db.Column(db.String(50))      # 谈单人/咨询师
+
+    __table_args__ = (
+        db.Index('idx_txn_patient_id', 'patient_id'),
+        db.Index('idx_txn_payment_date', 'payment_date'),
+        db.Index('idx_txn_consultant', 'consultant'),
+    )
 
     created_at = db.Column(db.DateTime, default=datetime.now)
 
@@ -366,6 +385,12 @@ class Consultation(db.Model):
     appointment_time = db.Column(db.String(50))              # 预约时间
     consultant = db.Column(db.String(50))                    # 网咨人员
     appointment_id = db.Column(db.Integer)                   # 关联的预约ID
+
+    __table_args__ = (
+        db.Index('idx_cons_consultant', 'consultant'),
+        db.Index('idx_cons_date', 'date'),
+    )
+
     created_at = db.Column(db.DateTime, default=datetime.now)
 
     def to_dict(self):

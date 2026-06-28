@@ -1807,6 +1807,26 @@ def ensure_initialized():
                         print(f'⚠️ Migration skip employees.{col_name}: {e}')
             db.session.commit()
 
+        # ===== Migration: add indexes for performance =====
+        index_sqls = [
+            'CREATE INDEX IF NOT EXISTS idx_appt_scheduled_date ON appointments(scheduled_date)',
+            'CREATE INDEX IF NOT EXISTS idx_appt_visit_type ON appointments(visit_type)',
+            'CREATE INDEX IF NOT EXISTS idx_appt_inviter ON appointments(inviter)',
+            'CREATE INDEX IF NOT EXISTS idx_appt_actual_visit ON appointments(actual_visit)',
+            'CREATE INDEX IF NOT EXISTS idx_txn_payment_date ON transactions(payment_date)',
+            'CREATE INDEX IF NOT EXISTS idx_txn_consultant ON transactions(consultant)',
+            'CREATE INDEX IF NOT EXISTS idx_patient_online_consultant ON patients(online_consultant)',
+            'CREATE INDEX IF NOT EXISTS idx_cons_consultant ON consultations(consultant)',
+            'CREATE INDEX IF NOT EXISTS idx_cons_date ON consultations(date)',
+        ]
+        for sql in index_sqls:
+            try:
+                db.session.execute(sa_text(sql))
+            except Exception as e:
+                print(f'⚠️ Index skip: {e}')
+        db.session.commit()
+        print('📌 Indexes checked/created')
+
         # Import data if empty (rollback any pending failed ops first)
         try:
             db.session.rollback()
