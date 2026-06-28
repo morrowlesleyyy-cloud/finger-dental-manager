@@ -22,7 +22,11 @@ def parse_date(s):
     if not s or str(s).strip() == '':
         return None
     if isinstance(s, (datetime, date)):
-        return s if isinstance(s, date) else s.date()
+        d = s if isinstance(s, date) else s.date()
+        # Excel empty cells become 1900 dates
+        if d.year < 2000:
+            return None
+        return d
     s = str(s).strip().replace('\xa0', ' ')
     
     m = re.match(r'(\d{1,2})[./](\d{1,2})', s)
@@ -37,7 +41,9 @@ def parse_date(s):
     
     for fmt in ['%Y-%m-%d', '%Y年%m月%d日', '%Y/%m/%d', '%m月%d日', '%d/%m/%Y']:
         try:
-            return datetime.strptime(s, fmt).date()
+            d = datetime.strptime(s, fmt).date()
+            if d.year >= 2000:
+                return d
         except:
             continue
     return None
@@ -72,6 +78,24 @@ def clean_name(name):
     return str(name).replace('\xa0', ' ').strip()
 
 
+# 内部编号计数器，按年月分组
+_id_counters = {}
+
+def generate_internal_id(scheduled_date):
+    """生成格式: YYYY-MM-NNNN"""
+    if scheduled_date:
+        if isinstance(scheduled_date, date):
+            ym = scheduled_date.strftime('%Y-%m')
+        else:
+            ym = str(scheduled_date)[:7]
+    else:
+        ym = date.today().strftime('%Y-%m')
+    if ym not in _id_counters:
+        _id_counters[ym] = 0
+    _id_counters[ym] += 1
+    return f'{ym}-{_id_counters[ym]:04d}'
+
+
 def import_performance(wb, sheet_name):
     ws = wb[sheet_name]
     headers = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
@@ -94,9 +118,8 @@ def import_performance(wb, sheet_name):
         if not patient and patient_name:
             patient = Patient.query.filter_by(name=patient_name).first()
         if not patient:
-            last = Patient.query.order_by(Patient.id.desc()).first()
-            next_num = (last.id + 1) if last else 1
-            internal_id = f'MEYA-{next_num:04d}'
+            sd = parse_date(row_dict.get('日期', ''))
+            internal_id = generate_internal_id(sd)
             patient = Patient(
                 internal_id=internal_id,
                 name=patient_name,
@@ -117,34 +140,44 @@ def import_performance(wb, sheet_name):
                 if not patient:
                     print(f'⚠️ Skipping duplicate: {patient_name}')
                     continue
+        # 检查重复预约
+        sd = parse_date(row_dict.get('日期', ''))
+        vt = clean_name(row_dict.get('初/复诊', ''))
+        existing_appt = Appointment.query.filter_by(patient_id=patient.id, scheduled_date=sd, visit_type=vt).first()
+        if not existing_appt:
+            appt = Appointment(
+                patient_id=patient.id,
+                scheduled_date=sd,
+                visit_type=vt,
+                actual_visit=clean_name(row_dict.get('实际到访情况', '')),
+                followup_24h=row_dict.get('跟进记录(24h)', ''),
+                followup_7d=row_dict.get('跟进记录(7天)', ''),
+                followup_15d=row_dict.get('跟进记录(15天)', ''),
+                followup_30d=row_dict.get('跟进记录(30天)', ''),
+                need_collab=clean_name(row_dict.get('是否需要协同跟进', '')),
+                invalid_reason=row_dict.get('无效原因', ''),
+                has_continue=clean_name(row_dict.get('是否有续种', '')),
+            )
+            db.session.add(appt)
         
-        appt = Appointment(
-            patient_id=patient.id,
-            scheduled_date=parse_date(row_dict.get('日期', '')),
-            visit_type=clean_name(row_dict.get('初/复诊', '')),
-            actual_visit=clean_name(row_dict.get('实际到访情况', '')),
-            followup_24h=row_dict.get('跟进记录(24h)', ''),
-            followup_7d=row_dict.get('跟进记录(7天)', ''),
-            followup_15d=row_dict.get('跟进记录(15天)', ''),
-            followup_30d=row_dict.get('跟进记录(30天)', ''),
-            need_collab=clean_name(row_dict.get('是否需要协同跟进', '')),
-            invalid_reason=row_dict.get('无效原因', ''),
-            has_continue=clean_name(row_dict.get('是否有续种', '')),
-        )
-        db.session.add(appt)
-        
-        txn = Transaction(
-            patient_id=patient.id,
-            plan_type=clean_name(row_dict.get('方案类型', '')),
-            performance_amount=parse_float(row_dict.get('业绩金额(半款)', '0')),
-            paid_amount=parse_float(row_dict.get('已付金额(半款)', '0')),
-            payment_date=parse_date(row_dict.get('交款日期', '')),
-            deposit_amount=parse_float(row_dict.get('定金金额', '0')),
-            deposit_contract=parse_float(row_dict.get('定金合同金额', '0')),
-            deposit_return_date=parse_date(row_dict.get('定金回款日期', '')),
-            consultant=clean_name(row_dict.get('咨询', '')),
-        )
-        db.session.add(txn)
+        # 检查重复交易
+        pd2 = parse_date(row_dict.get('交款日期', ''))
+        pt = clean_name(row_dict.get('方案类型', ''))
+        pa = parse_float(row_dict.get('业绩金额(半款)', '0'))
+        existing_txn = Transaction.query.filter_by(patient_id=patient.id, payment_date=pd2, plan_type=pt, performance_amount=pa).first()
+        if not existing_txn:
+            txn = Transaction(
+                patient_id=patient.id,
+                plan_type=pt,
+                performance_amount=pa,
+                paid_amount=parse_float(row_dict.get('已付金额(半款)', '0')),
+                payment_date=pd2,
+                deposit_amount=parse_float(row_dict.get('定金金额', '0')),
+                deposit_contract=parse_float(row_dict.get('定金合同金额', '0')),
+                deposit_return_date=parse_date(row_dict.get('定金回款日期', '')),
+                consultant=clean_name(row_dict.get('咨询', '')),
+            )
+            db.session.add(txn)
         imported += 1
     
     return imported
@@ -175,9 +208,8 @@ def import_appointment(wb, sheet_name):
         if not patient and patient_name:
             patient = Patient.query.filter_by(name=patient_name).first()
         if not patient:
-            last = Patient.query.order_by(Patient.id.desc()).first()
-            next_num = (last.id + 1) if last else 1
-            internal_id = f'MEYA-{next_num:04d}'
+            sd = parse_date(row_dict.get('预计到访日期', ''))
+            internal_id = generate_internal_id(sd)
             patient = Patient(
                 internal_id=internal_id,
                 name=patient_name,
@@ -190,19 +222,24 @@ def import_appointment(wb, sheet_name):
             db.session.add(patient)
             db.session.flush()
         
-        appt = Appointment(
-            patient_id=patient.id,
-            scheduled_date=parse_date(row_dict.get('预计到访日期', '')),
-            scheduled_time=clean_name(row_dict.get('预计具体时间', '')),
-            inviter=clean_name(row_dict.get('邀约人', '')),
-            inviter_2=clean_name(row_dict.get('邀约人 2', '')),
-            phone=phone,
-            visit_type=clean_name(row_dict.get('到访类型', '')),
-            actual_visit=clean_name(row_dict.get('实际到访情况', '')),
-            consultation_notes=row_dict.get('咨询及跟进情况，日期+内容', ''),
-            registered_date=parse_date(row_dict.get('登记日期', '')),
-        )
-        db.session.add(appt)
+        # 检查重复预约
+        appt_sd = parse_date(row_dict.get('预计到访日期', ''))
+        appt_vt = clean_name(row_dict.get('到访类型', ''))
+        existing_appt = Appointment.query.filter_by(patient_id=patient.id, scheduled_date=appt_sd, visit_type=appt_vt).first()
+        if not existing_appt:
+            appt = Appointment(
+                patient_id=patient.id,
+                scheduled_date=appt_sd,
+                scheduled_time=clean_name(row_dict.get('预计具体时间', '')),
+                inviter=clean_name(row_dict.get('邀约人', '')),
+                inviter_2=clean_name(row_dict.get('邀约人 2', '')),
+                phone=phone,
+                visit_type=appt_vt,
+                actual_visit=clean_name(row_dict.get('实际到访情况', '')),
+                consultation_notes=row_dict.get('咨询及跟进情况，日期+内容', ''),
+                registered_date=parse_date(row_dict.get('登记日期', '')),
+            )
+            db.session.add(appt)
         
         contract_amt = parse_float(row_dict.get('定金合同额', '0'))
         deposit_amt = parse_float(row_dict.get('定金额', '0'))
@@ -212,33 +249,37 @@ def import_appointment(wb, sheet_name):
         debt_amt = parse_float(row_dict.get('欠款额', '0'))
         
         if contract_amt > 0 or perf_amt > 0 or paid_amt > 0:
-            txn = Transaction(
-                patient_id=patient.id,
-                plan_type=clean_name(row_dict.get('方案类型', '')),
-                plan_detail=row_dict.get('方案（品牌、颗数、牙位）', ''),
-                brand=row_dict.get('品牌', ''),
-                tooth_positions=row_dict.get('牙位', ''),
-                tooth_count=parse_int(row_dict.get('颗数', '0')),
-                bone_graft=row_dict.get('骨粉', ''),
-                bone_membrane=row_dict.get('骨膜', ''),
-                sinus_lift=row_dict.get('内外提', ''),
-                deposit_amount=deposit_amt,
-                deposit_contract=contract_amt,
-                deposit_date=parse_date(row_dict.get('定金日期', '')),
-                deposit_return_date=parse_date(row_dict.get('定金回款日期', '')),
-                performance_amount=perf_amt,
-                paid_amount=paid_amt,
-                payment_date=parse_date(row_dict.get('成交日期', '')),
-                supplement_amount=supp_amt,
-                supplement_date=parse_date(row_dict.get('补费日期', '')),
-                debt_amount=debt_amt,
-                supplement_records=row_dict.get('补费记录（日期+金额）', ''),
-                treatment_date=parse_date(row_dict.get('治疗日期', '')),
-                treatment_doctor=clean_name(row_dict.get('治疗医生', '')),
-                consultant=clean_name(row_dict.get('谈单人', '')),
-                visit_outcome=clean_name(row_dict.get('成交类型', '')),
-            )
-            db.session.add(txn)
+            txn_pd = parse_date(row_dict.get('成交日期', ''))
+            txn_pt = clean_name(row_dict.get('方案类型', ''))
+            existing_txn = Transaction.query.filter_by(patient_id=patient.id, payment_date=txn_pd, plan_type=txn_pt, performance_amount=perf_amt).first()
+            if not existing_txn:
+                txn = Transaction(
+                    patient_id=patient.id,
+                    plan_type=txn_pt,
+                    plan_detail=row_dict.get('方案（品牌、颗数、牙位）', ''),
+                    brand=row_dict.get('品牌', ''),
+                    tooth_positions=row_dict.get('牙位', ''),
+                    tooth_count=parse_int(row_dict.get('颗数', '0')),
+                    bone_graft=row_dict.get('骨粉', ''),
+                    bone_membrane=row_dict.get('骨膜', ''),
+                    sinus_lift=row_dict.get('内外提', ''),
+                    deposit_amount=deposit_amt,
+                    deposit_contract=contract_amt,
+                    deposit_date=parse_date(row_dict.get('定金日期', '')),
+                    deposit_return_date=parse_date(row_dict.get('定金回款日期', '')),
+                    performance_amount=perf_amt,
+                    paid_amount=paid_amt,
+                    payment_date=txn_pd,
+                    supplement_amount=supp_amt,
+                    supplement_date=parse_date(row_dict.get('补费日期', '')),
+                    debt_amount=debt_amt,
+                    supplement_records=row_dict.get('补费记录（日期+金额）', ''),
+                    treatment_date=parse_date(row_dict.get('治疗日期', '')),
+                    treatment_doctor=clean_name(row_dict.get('治疗医生', '')),
+                    consultant=clean_name(row_dict.get('谈单人', '')),
+                    visit_outcome=clean_name(row_dict.get('成交类型', '')),
+                )
+                db.session.add(txn)
         
         imported += 1
     
@@ -260,7 +301,7 @@ def import_from_files(flask_app=None):
         
         wb = openpyxl.load_workbook(os.path.join(DATA_DIR, '接诊业绩数据.xlsx'), data_only=True)
         total_perf = 0
-        for sheet in ['3月', '4月', '5月']:
+        for sheet in wb.sheetnames:
             if sheet in wb.sheetnames:
                 count = import_performance(wb, sheet)
                 print(f"  {sheet}: {count} 条")
@@ -269,7 +310,7 @@ def import_from_files(flask_app=None):
         print(f"\n📥 开始导入预约总表数据...")
         wb2 = openpyxl.load_workbook(os.path.join(DATA_DIR, '预约总表.xlsx'), data_only=True)
         total_appt = 0
-        for sheet in ['1月', '2月', '3月', '4月', '5月', '2025']:
+        for sheet in wb2.sheetnames:
             if sheet in wb2.sheetnames:
                 count = import_appointment(wb2, sheet)
                 print(f"  {sheet}: {count} 条")

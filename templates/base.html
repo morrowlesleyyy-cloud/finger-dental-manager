@@ -8,6 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <style>
         :root {
             --sidebar-width: 240px;
@@ -138,6 +139,74 @@
             font-size: 1.3rem;
             font-weight: 600;
         }
+        /* Tooth Cross Grid */
+        .tooth-cross { display: inline-block; }
+        .tooth-cross-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            width: 160px;
+            height: 100px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .tc-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3px;
+        }
+        .tc-ur { border-right: 1px solid #ccc; border-bottom: 1px solid #ccc; }
+        .tc-ul { border-bottom: 1px solid #ccc; }
+        .tc-lr { border-right: 1px solid #ccc; }
+        .tc-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #888;
+            text-transform: uppercase;
+            line-height: 1;
+        }
+        .tc-input {
+            width: 100%;
+            font-size: 11px;
+            text-align: center;
+            padding: 2px 4px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+            background: #fff;
+        }
+        .tc-input:focus {
+            border-color: #e94560;
+            box-shadow: 0 0 0 0.15rem rgba(233,69,96,0.15);
+            outline: none;
+        }
+        /* Compact cross for detail modal */
+        .tooth-cross-mini-grid {
+            display: inline-grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            width: 100px;
+            height: 64px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .tcm-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            padding: 2px;
+        }
+        .tcm-cell code {
+            font-size: 11px;
+            background: none;
+            color: #333;
+        }
+        .tcm-ur { border-right: 1px solid #ccc; border-bottom: 1px solid #ccc; }
+        .tcm-ul { border-bottom: 1px solid #ccc; }
+        .tcm-lr { border-right: 1px solid #ccc; }
+        .tooth-cross-mini { font-size: 11px; line-height: 1.6; }
+        .tcm-cell-inline { display: inline-block; margin-right: 8px; }
         @media (max-width: 768px) {
             .sidebar {
                 width: 100%;
@@ -168,7 +237,10 @@
             <i class="bi bi-people"></i> 患者管理
         </a>
         <a class="nav-link" href="/appointments" data-page="appointments">
-            <i class="bi bi-calendar-check"></i> 预约管理
+            <i class="bi bi-calendar-check"></i> 初诊预约
+        </a>
+        <a class="nav-link" href="/followups" data-page="followups">
+            <i class="bi bi-calendar-heart"></i> 复诊预约
         </a>
         <a class="nav-link" href="/transactions" data-page="transactions">
             <i class="bi bi-cash-stack"></i> 成交管理
@@ -176,8 +248,17 @@
         <a class="nav-link" href="/reports" data-page="reports">
             <i class="bi bi-bar-chart"></i> 数据报表
         </a>
-        <a class="nav-link" href="/import" data-page="import">
-            <i class="bi bi-upload"></i> 数据导入
+        <a class="nav-link" href="/performance" data-page="performance">
+            <i class="bi bi-trophy"></i> 业绩管理
+        </a>
+        <a class="nav-link" href="/patient-images" data-page="patient-images">
+            <i class="bi bi-camera"></i> 患者图片
+        </a>
+        <a class="nav-link" href="/treatment-plans" data-page="treatment-plans">
+            <i class="bi bi-clipboard2-heart"></i> 治疗方案
+        </a>
+        <a class="nav-link" href="/consultations" data-page="consultations">
+            <i class="bi bi-chat-dots"></i> 咨询管理
         </a>
         <a class="nav-link" href="/employees" data-page="employees" id="navEmployees" style="display:none">
             <i class="bi bi-person-gear"></i> 员工管理
@@ -251,6 +332,7 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
 <script>
+Chart.register(ChartDataLabels);
 // ===================== Utility Functions =====================
 
 // Global fetch wrapper to handle 401
@@ -292,9 +374,47 @@ function saveForm() {
     const type = document.getElementById('formType')?.value;
     if (type === 'patient') savePatientForm();
     else if (type === 'appointment') saveAppointmentForm();
+    else if (type === 'followup') saveFollowupForm();
     else if (type === 'transaction') saveTransactionForm();
     else if (type === 'employee') saveEmployeeForm();
     else showToast('未知表单类型', 'error');
+}
+
+function timePickerHtml(id, selected) {
+    selected = selected || '';
+    // Parse existing time like "2:00 PM" or "10:30AM"
+    var match = selected.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    var selHour = match ? parseInt(match[1]) : '';
+    var selMin = match ? match[2] : '00';
+    var selAmpm = match ? match[3].toUpperCase() : '';
+
+    var h = '<select class="form-select form-select-sm" id="' + id + '_hour" style="width:70px"><option value="">时</option>';
+    for (var i = 1; i <= 12; i++) {
+        h += '<option value="' + i + '"' + (selHour === i ? ' selected' : '') + '>' + i + '</option>';
+    }
+    h += '</select>';
+
+    var m = '<select class="form-select form-select-sm" id="' + id + '_min" style="width:80px"><option value="">分</option>';
+    ['00','15','30','45'].forEach(function(v) {
+        m += '<option value="' + v + '"' + (selMin === v ? ' selected' : '') + '>' + v + '</option>';
+    });
+    m += '</select>';
+
+    var a = '<select class="form-select form-select-sm" id="' + id + '_ampm" style="width:80px"><option value="">—</option>';
+    ['AM','PM'].forEach(function(v) {
+        a += '<option value="' + v + '"' + (selAmpm === v ? ' selected' : '') + '>' + v + '</option>';
+    });
+    a += '</select>';
+
+    return '<div class="d-flex gap-1">' + h + m + a + '</div>';
+}
+
+function getTimePickerValue(id) {
+    var h = document.getElementById(id + '_hour').value;
+    var m = document.getElementById(id + '_min').value;
+    var a = document.getElementById(id + '_ampm').value;
+    if (!h || !a) return '';
+    return h + ':' + (m || '00') + ' ' + a;
 }
 
 function formatMoney(n) {
@@ -314,17 +434,39 @@ function escapeHtml(text) {
 const PAGES = {
     dashboard: { title: '首页看板', render: renderDashboard },
     patients: { title: '患者管理', render: renderPatients },
-    appointments: { title: '预约管理', render: renderAppointments },
+    appointments: { title: '初诊预约', render: renderAppointments },
+    followups: { title: '复诊预约', render: renderFollowups },
     transactions: { title: '成交管理', render: renderTransactions },
     reports: { title: '数据报表', render: renderReports },
-    import: { title: '数据导入', render: renderImport },
     employees: { title: '员工管理', render: renderEmployees },
+    'patient-images': { title: '患者图片', render: renderPatientImages },
+    'treatment-plans': { title: '治疗方案', render: renderTreatmentPlans },
+    'consultations': { title: '咨询管理', render: renderConsultations },
+    'performance': { title: '业绩管理', render: renderPerformance },
 };
 
 function navigateTo(page) {
     // Update URL
     const url = page === 'dashboard' ? '/' : '/' + page;
     window.history.pushState({}, '', url);
+
+    // Permission check
+    var perms = window.__permissions || {};
+    var permMap = {
+        appointments: 'can_view_appointments',
+        followups: 'can_view_appointments',
+        transactions: 'can_view_transactions',
+        reports: 'can_view_reports',
+        performance: 'can_view_performance',
+        'patient-images': 'can_view_images',
+        'treatment-plans': 'can_view_treatment_plans',
+        consultations: 'can_view_consultations',
+    };
+    if (permMap[page] && !perms.is_admin && !perms[permMap[page]]) {
+        showToast('权限不足，无法访问该页面', 'error');
+        page = 'dashboard';
+        window.history.pushState({}, '', '/');
+    }
 
     // Update sidebar
     document.querySelectorAll('.sidebar .nav-link').forEach(el => {
@@ -361,10 +503,23 @@ async function checkAuth() {
         if (data.logged_in) {
             const name = data.display_name || data.username;
             document.getElementById('userDisplay').textContent = '👤 ' + name;
+            window.__displayName = name;
             
-            // Show employee management link only for admin
-            if (data.permissions && data.permissions.is_admin) {
-                document.getElementById('navEmployees').style.display = '';
+            // Show / hide nav items based on permissions
+            if (data.permissions) {
+                var p = data.permissions;
+                document.getElementById('navEmployees').style.display = p.is_admin ? '' : 'none';
+                // Only hide restricted pages for non-admin staff
+                if (!p.is_admin) {
+                    toggleNavLink('appointments', p.can_view_appointments);
+                    toggleNavLink('followups', p.can_view_appointments);
+                    toggleNavLink('transactions', p.can_view_transactions);
+                    toggleNavLink('reports', p.can_view_reports);
+                    toggleNavLink('performance', p.can_view_performance);
+                    toggleNavLink('patient-images', p.can_view_images);
+                    toggleNavLink('treatment-plans', p.can_view_treatment_plans);
+                    toggleNavLink('consultations', p.can_view_consultations);
+                }
             }
             
             // Update page routing to respect permissions
@@ -378,6 +533,11 @@ async function checkAuth() {
         window.location.href = '/login';
         return false;
     }
+}
+
+function toggleNavLink(page, show) {
+    var link = document.querySelector('.sidebar .nav-link[data-page="' + page + '"]');
+    if (link) link.style.display = show ? '' : 'none';
 }
 
 async function handleLogout() {
@@ -428,11 +588,17 @@ function connectSSE() {
 
     ['patient_created', 'patient_updated', 'patient_deleted',
      'appointment_created', 'appointment_updated', 'appointment_deleted',
-     'transaction_created', 'transaction_updated', 'transaction_deleted'].forEach(evt => {
+     'transaction_created', 'transaction_updated', 'transaction_deleted',
+     'consultation_created', 'consultation_updated', 'consultation_deleted'].forEach(evt => {
         eventSource.addEventListener(evt, () => {
+            const page = getCurrentPage();
             // Refresh dashboard if on dashboard
-            if (getCurrentPage() === 'dashboard') {
+            if (page === 'dashboard') {
                 renderDashboard();
+            }
+            // Refresh consultations page if open
+            if (page === 'consultations') {
+                renderConsultations();
             }
         });
     });
@@ -538,7 +704,7 @@ async function renderDashboard() {
                         <div class="table-responsive">
                             <table class="table table-sm table-hover mb-0">
                                 <thead><tr>
-                                    <th>日期</th><th>患者</th><th>时间</th><th>邀约人</th><th>状态</th>
+                                    <th>日期</th><th>患者</th><th>时间</th><th>网咨人员</th><th>状态</th>
                                 </tr></thead>
                                 <tbody>
                                     ${data.recent_appointments.length === 0 ? '<tr><td colspan="5" class="text-muted text-center">暂无预约</td></tr>' :
@@ -653,18 +819,98 @@ function formatVisitBadge(status) {
            `<span class="badge bg-light text-muted">待确认</span>`;
 }
 
+function renderDetailTreatmentPlans(plans) {
+    if (!plans || plans.length === 0) {
+        return '<p class="text-muted small">暂无治疗方案</p>';
+    }
+    const checks = plans.filter(p => p.section === '检查');
+    const treatments = plans.filter(p => p.section === '治疗方案');
+    let html = '';
+    
+    function renderDetailItem(list) {
+        return list.map(item => {
+            const m = parseToothJson(item.tooth_mark);
+            const batchLabel = item.batch ? `<span class="badge bg-secondary me-1">${escapeHtml(item.batch)}</span>` : '';
+            const costItems = item.cost_items || [];
+            let costHtml = '';
+            if (costItems.length > 0) {
+                costHtml = `
+                <div class="table-responsive mt-1">
+                    <table class="table table-sm table-borderless mb-0" style="font-size:11px">
+                        <thead>
+                            <tr style="background:#fff5f5">
+                                <th>大类</th><th>小类</th><th class="text-end">数量</th><th class="text-end">单价</th><th class="text-end">折扣</th><th class="text-end">总价</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${costItems.map(ci => `
+                                <tr>
+                                    <td>${escapeHtml(ci.major_category) || '-'}</td>
+                                    <td>${escapeHtml(ci.sub_category) || '-'}</td>
+                                    <td class="text-end">${ci.quantity || 1}</td>
+                                    <td class="text-end">${formatMoney(ci.unit_price)}</td>
+                                    <td class="text-end">${ci.discount_rate || 0}%</td>
+                                    <td class="text-end fw-bold">${formatMoney(ci.total_price)}</td>
+                                </tr>
+                            `).join('')}
+                            <tr style="border-top:1px solid #e94560;font-weight:700">
+                                <td colspan="5" class="text-end" style="color:#e94560">小计</td>
+                                <td class="text-end fw-bold">${formatMoney(item.cost_total || 0)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>`;
+            }
+            return `
+                <div class="mb-2">
+                    <div class="d-flex gap-2 align-items-start">
+                        ${batchLabel}
+                        <div class="tooth-cross-mini-grid">
+                            <div class="tcm-cell tcm-ur"><code>${escapeHtml(m.UR) || '-'}</code></div>
+                            <div class="tcm-cell tcm-ul"><code>${escapeHtml(m.UL) || '-'}</code></div>
+                            <div class="tcm-cell tcm-lr"><code>${escapeHtml(m.LR) || '-'}</code></div>
+                            <div class="tcm-cell tcm-ll"><code>${escapeHtml(m.LL) || '-'}</code></div>
+                        </div>
+                        <div class="text-muted small" style="flex:1">${escapeHtml(item.note) || '-'}</div>
+                    </div>
+                    ${costHtml}
+                </div>`;
+        }).join('');
+    }
+
+    if (checks.length > 0) {
+        html += '<div class="mb-2"><span class="badge bg-success small">检查</span></div>';
+        html += renderDetailItem(checks);
+    }
+    if (treatments.length > 0) {
+        html += '<div class="mb-2"><span class="badge bg-primary small">治疗方案</span></div>';
+        html += renderDetailItem(treatments);
+    }
+    return html;
+}
+
 // ===================== Patient List =====================
 
 let patientPage = 1;
 let patientSearch = '';
+let patientFilterDate = '';
 
 function renderPatients() {
     const body = document.getElementById('pageBody');
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
     body.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 align-items-center">
                 <input class="form-control form-control-sm" style="width:250px" id="patientSearch"
                        placeholder="🔍 搜索姓名/电话/网咨..." value="${escapeHtml(patientSearch)}">
+                <div class="btn-group btn-group-sm" id="dateFilterBtns">
+                    <button class="btn btn-outline-secondary" data-date="${yesterday}">📅 昨日</button>
+                    <button class="btn btn-outline-secondary" data-date="${today}">📅 今日</button>
+                    <button class="btn btn-outline-secondary" data-date="${tomorrow}">📅 明日</button>
+                    <button class="btn btn-outline-secondary active" data-date="">全部</button>
+                </div>
             </div>
             <button class="btn btn-primary btn-sm" onclick="openPatientModal()">
                 <i class="bi bi-plus-lg"></i> 新增患者
@@ -675,12 +921,12 @@ function renderPatients() {
                 <table class="table table-hover mb-0" id="patientTable">
                     <thead class="table-light">
                         <tr>
-                            <th>姓名</th><th>电话</th><th>缺牙</th><th>来源</th>
-                            <th>网咨</th><th>创建日期</th><th>操作</th>
+                            <th>姓名</th><th>编号</th><th>电话</th><th>缺牙</th>
+                            <th>网咨人员</th><th>预约日期</th><th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="patientTableBody">
-                        <tr><td colspan="8" class="text-center py-4 text-muted">加载中...</td></tr>
+                        <tr><td colspan="7" class="text-center py-4 text-muted">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -697,6 +943,17 @@ function renderPatients() {
         loadPatients();
     });
 
+    // Date filter buttons
+    document.querySelectorAll('#dateFilterBtns .btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            patientFilterDate = this.dataset.date;
+            patientPage = 1;
+            document.querySelectorAll('#dateFilterBtns .btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            loadPatients();
+        });
+    });
+
     loadPatients();
 
     // Enter to search
@@ -711,7 +968,7 @@ function renderPatients() {
 async function loadPatients() {
     const tbody = document.getElementById('patientTableBody');
     try {
-        const res = await fetch(`/api/patients?page=${patientPage}&per_page=20&search=${encodeURIComponent(patientSearch)}`);
+        const res = await fetch(`/api/patients?page=${patientPage}&per_page=20&search=${encodeURIComponent(patientSearch)}&date=${encodeURIComponent(patientFilterDate)}`);
         const data = await res.json();
 
         if (data.data.length === 0) {
@@ -723,9 +980,8 @@ async function loadPatients() {
                     <td class="small text-muted">${escapeHtml(p.internal_id) || '-'}</td>
                     <td>${escapeHtml(p.phone) || '-'}</td>
                     <td>${escapeHtml(p.tooth_count) || '-'}</td>
-                    <td>${escapeHtml(p.source) || '-'}</td>
-                    <td>${escapeHtml(p.online_consultant) || '-'}</td>
-                    <td class="small">${p.created_at}</td>
+                    <td>${escapeHtml(p.inviter) || '-'}</td>
+                    <td class="small">${p.scheduled_date || '-'}</td>
                     <td onclick="event.stopPropagation()">
                         <button class="btn btn-outline-danger btn-sm py-0" onclick="deletePatient(${p.id})">
                             <i class="bi bi-trash"></i>
@@ -751,25 +1007,57 @@ async function loadPatients() {
 function openPatientDetail(pid) {
     fetch(`/api/patients/${pid}`).then(r => r.json()).then(data => {
         const p = data.patient;
+        const images = data.images || [];
         const modal = new bootstrap.Modal(document.getElementById('detailModal'));
         document.getElementById('detailModalLabel').textContent = `👤 ${p.name}`;
+
+        // Build images section
+        var imgHtml = '';
+        if (images.length === 0) {
+            imgHtml = '<p class="text-muted small">暂无图片</p>';
+        } else {
+            var preImages = images.filter(function(img) { return img.stage === '术前'; });
+            var postImages = images.filter(function(img) { return img.stage === '术后'; });
+            imgHtml = '<div class="row g-3">';
+            if (preImages.length > 0) {
+                imgHtml += '<div class="col-6"><h6 class="small text-primary fw-bold">🔵 术前 (' + preImages.length + ')</h6><div class="d-flex flex-wrap gap-1">';
+                preImages.forEach(function(img) {
+                    imgHtml += '<a href="' + img.url + '" target="_blank"><img src="' + img.url + '" class="img-thumbnail" style="width:90px;height:70px;object-fit:cover" title="' + escapeHtml(img.sub_type || img.category) + '"></a>';
+                });
+                imgHtml += '</div></div>';
+            }
+            if (postImages.length > 0) {
+                imgHtml += '<div class="col-6"><h6 class="small text-success fw-bold">🟢 术后 (' + postImages.length + ')</h6><div class="d-flex flex-wrap gap-1">';
+                postImages.forEach(function(img) {
+                    imgHtml += '<a href="' + img.url + '" target="_blank"><img src="' + img.url + '" class="img-thumbnail" style="width:90px;height:70px;object-fit:cover" title="' + escapeHtml(img.sub_type || img.category) + '"></a>';
+                });
+                imgHtml += '</div></div>';
+            }
+            imgHtml += '</div>';
+        }
+
         document.getElementById('detailModalBody').innerHTML = `
-            <div class="row g-3">
-                <div class="col-6"><label class="form-label">电话</label><p class="fw-bold">${escapeHtml(p.phone) || '-'}</p></div>
-                <div class="col-6"><label class="form-label">内部编号</label><p class="fw-bold">${escapeHtml(p.internal_id) || '-'}</p></div>
-                <div class="col-6"><label class="form-label">性别</label><p>${escapeHtml(p.gender) || '-'}</p></div>
-                <div class="col-6"><label class="form-label">年龄</label><p>${p.age || '-'}</p></div>
-                <div class="col-6"><label class="form-label">缺牙颗数</label><p>${escapeHtml(p.tooth_count) || '-'}</p></div>
-                <div class="col-6"><label class="form-label">来源</label><p>${escapeHtml(p.source) || '-'}</p></div>
-                <div class="col-6"><label class="form-label">网咨</label><p>${escapeHtml(p.online_consultant) || '-'}</p></div>
-                <div class="col-12"><label class="form-label">情况描述</label><p class="text-muted small">${escapeHtml(p.condition_desc) || '-'}</p></div>
+            <div class="mb-3">
+                <h6 class="fw-bold text-primary"><i class="bi bi-person"></i> 基本资料</h6>
+            </div>
+            <div class="row g-2 mb-2">
+                <div class="col-4"><span class="text-muted small">电话:</span> <span class="fw-medium">${escapeHtml(p.phone) || '-'}</span></div>
+                <div class="col-4"><span class="text-muted small">内部编号:</span> <span class="fw-medium">${escapeHtml(p.internal_id) || '-'}</span></div>
+                <div class="col-4"><span class="text-muted small">性别:</span> ${escapeHtml(p.gender) || '-'}</div>
+                <div class="col-4"><span class="text-muted small">年龄:</span> ${p.age || '-'}</div>
+                <div class="col-4"><span class="text-muted small">缺牙颗数:</span> ${escapeHtml(p.tooth_count) || '-'}</div>
+                <div class="col-4"><span class="text-muted small">来源:</span> ${escapeHtml(p.source) || '-'}</div>
+                <div class="col-4"><span class="text-muted small">网咨:</span> ${escapeHtml(p.online_consultant) || '-'}</div>
+                <div class="col-12"><span class="text-muted small">情况描述:</span> <span class="small">${escapeHtml(p.condition_desc) || '-'}</span></div>
             </div>
             <hr>
-            <h6 class="fw-bold">📅 预约记录 (${data.appointments.length})</h6>
+            <div class="mb-3">
+                <h6 class="fw-bold text-info"><i class="bi bi-calendar-check"></i> 预约记录 (${data.appointments.length})</h6>
+            </div>
             ${data.appointments.length === 0 ? '<p class="text-muted small">暂无</p>' : `
-            <div class="table-responsive">
+            <div class="table-responsive mb-3">
                 <table class="table table-sm">
-                    <thead><tr><th>日期</th><th>类型</th><th>到访</th><th>邀约人</th></tr></thead>
+                    <thead><tr><th>日期</th><th>类型</th><th>到访</th><th>网咨人员</th></tr></thead>
                     <tbody>${data.appointments.map(a => `
                         <tr><td>${a.scheduled_date || '-'}</td><td>${a.visit_type || '-'}</td>
                         <td>${formatVisitBadge(a.actual_visit)}</td><td>${escapeHtml(a.inviter) || '-'}</td></tr>
@@ -777,9 +1065,11 @@ function openPatientDetail(pid) {
                 </table>
             </div>`}
             <hr>
-            <h6 class="fw-bold">💰 交易记录 (${data.transactions.length})</h6>
+            <div class="mb-3">
+                <h6 class="fw-bold text-warning"><i class="bi bi-cash-stack"></i> 交易记录 (${data.transactions.length})</h6>
+            </div>
             ${data.transactions.length === 0 ? '<p class="text-muted small">暂无</p>' : `
-            <div class="table-responsive">
+            <div class="table-responsive mb-3">
                 <table class="table table-sm">
                     <thead><tr><th>日期</th><th>方案</th><th>业绩</th><th>咨询师</th></tr></thead>
                     <tbody>${data.transactions.map(t => `
@@ -789,6 +1079,16 @@ function openPatientDetail(pid) {
                     `).join('')}</tbody>
                 </table>
             </div>`}
+            <hr>
+            <div class="mb-2">
+                <h6 class="fw-bold" style="color:#198754"><i class="bi bi-clipboard2-heart"></i> 治疗方案</h6>
+            </div>
+            ${renderDetailTreatmentPlans(data.treatment_plans)}
+            <hr>
+            <div class="mb-2">
+                <h6 class="fw-bold" style="color:#6f42c1"><i class="bi bi-image"></i> 图片 (${images.length})</h6>
+            </div>
+            ${imgHtml}
         `;
         modal.show();
     });
@@ -926,7 +1226,7 @@ function renderAppointments() {
     body.innerHTML = `
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
             <input class="form-control form-control-sm" style="width:200px" id="apptSearch"
-                   placeholder="🔍 搜索患者/邀约人...">
+                   placeholder="🔍 搜索患者/网咨人员...">
             <select class="form-select form-select-sm" style="width:auto" id="apptFilter">
                 <option value="">全部预约</option>
                 <option value="today">今日</option>
@@ -946,7 +1246,7 @@ function renderAppointments() {
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
-                        <tr><th>预约日期</th><th>患者</th><th>时间</th><th>邀约人</th><th>类型</th><th>实际到访</th><th>操作</th></tr>
+                        <tr><th>预约日期</th><th>患者</th><th>时间</th><th>网咨人员</th><th>类型</th><th>实际到访</th><th>操作</th></tr>
                     </thead>
                     <tbody id="apptTableBody">
                         <tr><td colspan="7" class="text-center py-4 text-muted">加载中...</td></tr>
@@ -1035,15 +1335,15 @@ function openAppointmentModal(id) {
                 <div class="col-4"><label class="form-label">预约日期</label>
                     <input class="form-control" id="aScheduledDate" type="date" value="${appt ? appt.scheduled_date : ''}"></div>
                 <div class="col-4"><label class="form-label">时间</label>
-                    <input class="form-control" id="aScheduledTime" value="${appt ? escapeHtml(appt.scheduled_time) : ''}" placeholder="如 10:30AM"></div>
+                    ${timePickerHtml('aScheduledTime', appt ? appt.scheduled_time : '')}</div>
                 <div class="col-4"><label class="form-label">登记日期</label>
                     <input class="form-control" id="aRegisteredDate" type="date" value="${appt ? appt.registered_date : ''}"></div>
-                <div class="col-4"><label class="form-label">邀约人</label>
+                <div class="col-4"><label class="form-label">网咨人员</label>
                     <input class="form-control" id="aInviter" value="${appt ? escapeHtml(appt.inviter) : ''}"></div>
                 <div class="col-4"><label class="form-label">到访类型</label>
                     <select class="form-select" id="aVisitType">
                         <option value="">请选择</option>
-                        <option value="初诊" ${appt && appt.visit_type === '初诊' ? 'selected' : ''}>初诊</option>
+                        <option value="初诊" ${(!appt || appt.visit_type === '初诊') ? 'selected' : ''}>初诊</option>
                         <option value="复诊" ${appt && appt.visit_type === '复诊' ? 'selected' : ''}>复诊</option>
                         <option value="其他" ${appt && appt.visit_type === '其他' ? 'selected' : ''}>其他</option>
                     </select></div>
@@ -1083,7 +1383,7 @@ async function saveAppointmentForm() {
         patient_name: name,
         phone: document.getElementById('aPhone').value.trim(),
         scheduled_date: document.getElementById('aScheduledDate').value,
-        scheduled_time: document.getElementById('aScheduledTime').value.trim(),
+        scheduled_time: getTimePickerValue('aScheduledTime'),
         registered_date: document.getElementById('aRegisteredDate').value,
         inviter: document.getElementById('aInviter').value.trim(),
         visit_type: document.getElementById('aVisitType').value,
@@ -1116,6 +1416,192 @@ async function deleteAppointment(id) {
         const res = await fetch('/api/appointments/' + id, {method: 'DELETE'});
         const data = await res.json();
         if (data.success) { showToast('已删除'); loadAppointments(); }
+    } catch (e) { showToast('删除失败', 'error'); }
+}
+
+// ===================== Follow-up Visits Page =====================
+
+let fupPage = 1;
+let fupSearch = '';
+
+function renderFollowups() {
+    const body = document.getElementById('pageBody');
+    fupPage = 1;
+    fupSearch = '';
+    body.innerHTML = `
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <input class="form-control form-control-sm" style="width:220px" id="fupSearch"
+                   placeholder="🔍 搜索患者/医生...">
+            <button class="btn btn-primary btn-sm" onclick="openFollowupModal()">
+                <i class="bi bi-plus-lg"></i> 新建复诊
+            </button>
+        </div>
+        <div class="chart-container p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>预约日期</th><th>时间</th><th>患者</th><th>医生</th>
+                            <th>项目</th><th class="text-end">总费用</th><th class="text-end">已交</th><th class="text-end">欠费</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fupTableBody">
+                        <tr><td colspan="9" class="text-center py-4 text-muted">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center p-3 border-top">
+                <small class="text-muted" id="fupTotal">共 0 条</small>
+                <nav><ul class="pagination pagination-sm mb-0" id="fupPagination"></ul></nav>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('fupSearch').addEventListener('input', (e) => {
+        fupSearch = e.target.value;
+        fupPage = 1;
+        loadFollowups();
+    });
+    loadFollowups();
+}
+
+async function loadFollowups() {
+    const tbody = document.getElementById('fupTableBody');
+    const params = new URLSearchParams({
+        page: fupPage, per_page: 20,
+        search: fupSearch,
+        visit_type: '复诊',
+    });
+    try {
+        const res = await fetch('/api/appointments?' + params);
+        const data = await res.json();
+        if (data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">暂无复诊预约</td></tr>';
+        } else {
+            tbody.innerHTML = data.data.map(a => {
+                const balance = (a.total_fee || 0) - (a.paid_fee || 0);
+                const balClass = balance > 0 ? 'text-danger fw-bold' : 'text-success';
+                return `
+                <tr onclick="openFollowupModal(${a.id})">
+                    <td class="small">${a.scheduled_date || '-'}</td>
+                    <td>${a.scheduled_time || '-'}</td>
+                    <td><strong>${escapeHtml(a.patient_name)}</strong></td>
+                    <td>${escapeHtml(a.doctor) || '-'}</td>
+                    <td class="text-muted small">${escapeHtml(a.treatment_project) || '-'}</td>
+                    <td class="text-end">${(a.total_fee || 0) ? 'RM ' + (a.total_fee || 0).toLocaleString() : '-'}</td>
+                    <td class="text-end">${(a.paid_fee || 0) ? 'RM ' + (a.paid_fee || 0).toLocaleString() : '-'}</td>
+                    <td class="text-end ${balClass}">${balance !== 0 ? 'RM ' + Math.abs(balance).toLocaleString() : '—'}</td>
+                    <td onclick="event.stopPropagation()">
+                        <button class="btn btn-outline-danger btn-sm py-0" onclick="deleteFollowup(${a.id})"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+        document.getElementById('fupTotal').textContent = `共 ${data.total} 条`;
+        renderPagination('fupPagination', data.page, data.pages, (p) => { fupPage = p; loadFollowups(); });
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">加载失败</td></tr>';
+    }
+}
+
+function openFollowupModal(id) {
+    const fetchData = id ? fetch(`/api/appointments/${id}`).then(r => r.json()).then(d => d.data) : Promise.resolve(null);
+    fetchData.then(appt => {
+        const modal = new bootstrap.Modal(document.getElementById('formModal'));
+        document.getElementById('formModalLabel').textContent = appt ? '编辑复诊' : '新建复诊';
+        const form = document.getElementById('formBody');
+        form.innerHTML = `
+            <input type="hidden" id="formType" value="followup">
+            <input type="hidden" id="fupId" value="${appt ? appt.id : ''}">
+            <div class="row g-3">
+                <div class="col-6">
+                    <label class="form-label">患者 *</label>
+                    <div class="input-group">
+                        <input class="form-control" id="fupPatientName" list="patientList2" value="${appt ? escapeHtml(appt.patient_name) : ''}" placeholder="输入患者名或搜索">
+                        <datalist id="patientList2"></datalist>
+                    </div>
+                </div>
+                <div class="col-6"><label class="form-label">电话</label>
+                    <input class="form-control" id="fupPhone" value="${appt ? escapeHtml(appt.phone) : ''}"></div>
+                <div class="col-4"><label class="form-label">预约日期</label>
+                    <input class="form-control" id="fupScheduledDate" type="date" value="${appt ? appt.scheduled_date : ''}"></div>
+                <div class="col-4"><label class="form-label">时间</label>
+                    ${timePickerHtml('fupScheduledTime', appt ? appt.scheduled_time : '')}</div>
+                <div class="col-4"><label class="form-label">医生</label>
+                    <input class="form-control" id="fupDoctor" value="${appt ? escapeHtml(appt.doctor) : ''}"></div>
+                <div class="col-12"><label class="form-label">治疗项目</label>
+                    <input class="form-control" id="fupProject" value="${appt ? escapeHtml(appt.treatment_project) : ''}" placeholder="如 种植修复 / 牙冠 / 补牙..."></div>
+                <div class="col-4"><label class="form-label">总费用 (RM)</label>
+                    <input class="form-control" id="fupTotalFee" type="number" step="0.01" value="${appt && appt.total_fee ? appt.total_fee : ''}"></div>
+                <div class="col-4"><label class="form-label">已交费用 (RM)</label>
+                    <input class="form-control" id="fupPaidFee" type="number" step="0.01" value="${appt && appt.paid_fee ? appt.paid_fee : ''}"></div>
+                <div class="col-4"><label class="form-label">欠费金额</label>
+                    <input class="form-control text-danger fw-bold" id="fupBalance" readonly value="${appt ? ((appt.total_fee || 0) - (appt.paid_fee || 0)).toFixed(2) : '0.00'}"></div>
+            </div>
+        `;
+        modal.show();
+
+        // Auto-calculate balance
+        const calcBalance = () => {
+            const total = parseFloat(document.getElementById('fupTotalFee').value) || 0;
+            const paid = parseFloat(document.getElementById('fupPaidFee').value) || 0;
+            document.getElementById('fupBalance').value = (total - paid).toFixed(2);
+        };
+        document.getElementById('fupTotalFee').addEventListener('input', calcBalance);
+        document.getElementById('fupPaidFee').addEventListener('input', calcBalance);
+
+        // Patient search autocomplete
+        document.getElementById('fupPatientName').addEventListener('input', async (e) => {
+            const val = e.target.value.trim();
+            if (val.length < 1) return;
+            const res = await fetch('/api/search/patients?q=' + encodeURIComponent(val));
+            const patients = await res.json();
+            const dl = document.getElementById('patientList2');
+            dl.innerHTML = patients.map(p => `<option value="${escapeHtml(p.name)}">`).join('');
+        });
+    });
+}
+
+async function saveFollowupForm() {
+    const name = document.getElementById('fupPatientName').value.trim();
+    const data = {
+        patient_name: name,
+        phone: document.getElementById('fupPhone').value.trim(),
+        scheduled_date: document.getElementById('fupScheduledDate').value,
+        scheduled_time: getTimePickerValue('fupScheduledTime'),
+        visit_type: '复诊',
+        doctor: document.getElementById('fupDoctor').value.trim(),
+        treatment_project: document.getElementById('fupProject').value.trim(),
+        total_fee: parseFloat(document.getElementById('fupTotalFee').value) || 0,
+        paid_fee: parseFloat(document.getElementById('fupPaidFee').value) || 0,
+    };
+    if (!name) { showToast('请输入患者姓名', 'error'); return; }
+
+    const id = document.getElementById('fupId').value;
+    try {
+        const url = id ? '/api/appointments/' + id : '/api/appointments';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+        const result = await res.json();
+        if (result.success) {
+            showToast(id ? '复诊已更新' : '复诊已创建');
+            bootstrap.Modal.getInstance(document.getElementById('formModal')).hide();
+            loadFollowups();
+        } else {
+            showToast(result.error || '保存失败', 'error');
+        }
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+
+async function deleteFollowup(id) {
+    if (!confirm('确认删除这条复诊记录？')) return;
+    try {
+        const res = await fetch('/api/appointments/' + id, {method: 'DELETE'});
+        const data = await res.json();
+        if (data.success) { showToast('已删除'); loadFollowups(); }
     } catch (e) { showToast('删除失败', 'error'); }
 }
 
@@ -1302,289 +1788,194 @@ async function deleteTransaction(id) {
 // ===================== Reports Page =====================
 
 let reportYear = new Date().getFullYear();
+let reportMonth = new Date().getMonth() + 1;
 let revenueChartInstance = null;
 
 function renderReports() {
     const body = document.getElementById('pageBody');
+    const now = new Date();
     body.innerHTML = `
         <div class="d-flex align-items-center gap-2 mb-3">
             <select class="form-select form-select-sm" style="width:auto" id="reportYear">
                 <option value="2026" ${reportYear === 2026 ? 'selected' : ''}>2026</option>
                 <option value="2025" ${reportYear === 2025 ? 'selected' : ''}>2025</option>
-                <option value="2024" ${reportYear === 2024 ? 'selected' : ''}>2024</option>
             </select>
-            <button class="btn btn-outline-primary btn-sm" onclick="loadReports()">
-                <i class="bi bi-arrow-clockwise"></i> 更新
-            </button>
+            <select class="form-select form-select-sm" style="width:auto" id="reportMonth">
+                ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m =>
+                    `<option value="${m}" ${reportMonth === m ? 'selected' : ''}>${m}月</option>`
+                ).join('')}
+            </select>
         </div>
         <div class="row g-3">
             <div class="col-12">
                 <div class="chart-container">
-                    <h6 class="fw-bold mb-3">📊 月度业绩趋势</h6>
-                    <canvas id="reportRevenueChart" height="200"></canvas>
+                    <h6 class="fw-bold mb-3">📅 每日预约数量</h6>
+                    <canvas id="chartApptDaily" height="130"></canvas>
                 </div>
             </div>
-            <div class="col-12 col-lg-6">
+            <div class="col-12">
                 <div class="chart-container">
-                    <h6 class="fw-bold mb-3">🏆 咨询师年度排名</h6>
-                    <div id="reportConsultants"></div>
+                    <h6 class="fw-bold mb-3">💰 每日成交金额</h6>
+                    <canvas id="chartRevDaily" height="130"></canvas>
                 </div>
             </div>
-            <div class="col-12 col-lg-3">
+            <div class="col-12">
                 <div class="chart-container">
-                    <h6 class="fw-bold mb-3">📌 客户来源</h6>
-                    <canvas id="sourceChart" height="200"></canvas>
+                    <h6 class="fw-bold mb-3">📞 网咨人员预约数量</h6>
+                    <canvas id="chartInviterAppt" height="130"></canvas>
                 </div>
             </div>
-            <div class="col-12 col-lg-3">
+            <div class="col-12">
                 <div class="chart-container">
-                    <h6 class="fw-bold mb-3">📌 到访情况</h6>
-                    <canvas id="visitChart" height="200"></canvas>
+                    <h6 class="fw-bold mb-3">💵 网咨人员成交金额</h6>
+                    <canvas id="chartConsultantRev" height="130"></canvas>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="chart-container">
+                    <h6 class="fw-bold mb-3">🧾 每日收款金额</h6>
+                    <canvas id="chartCollection" height="130"></canvas>
                 </div>
             </div>
         </div>
     `;
-    document.getElementById('reportYear').addEventListener('change', (e) => {
+    document.getElementById('reportYear').addEventListener('change', function(e) {
         reportYear = parseInt(e.target.value);
+        loadReports();
+    });
+    document.getElementById('reportMonth').addEventListener('change', function(e) {
+        reportMonth = parseInt(e.target.value);
         loadReports();
     });
     loadReports();
 }
 
-async function loadReports() {
-    try {
-        const res = await fetch('/api/reports/overview?year=' + reportYear);
-        const data = await res.json();
-
-        // Revenue chart
-        if (revenueChartInstance) revenueChartInstance.destroy();
-        setTimeout(() => {
-            const ctx = document.getElementById('reportRevenueChart');
+function loadReports() {
+    // Destroy old charts
+    ['chartApptDaily','chartRevDaily','chartInviterAppt','chartConsultantRev','chartCollection'].forEach(function(id) {
+        if (window['_'+id]) window['_'+id].destroy();
+    });
+    
+    fetch('/api/reports/monthly?year=' + reportYear + '&month=' + reportMonth).then(function(r) { return r.json(); }).then(function(data) {
+        function makeBar(canvasId, labels, values, color, label, formatVal) {
+            var ctx = document.getElementById(canvasId);
             if (!ctx) return;
-            revenueChartInstance = new Chart(ctx, {
+            formatVal = formatVal || function(v) { return v; };
+            window['_'+canvasId] = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: data.monthly_revenue.map(m => m.month),
-                    datasets: [{
-                        label: '业绩 (RM)',
-                        data: data.monthly_revenue.map(m => m.amount),
-                        backgroundColor: '#4cc9f090',
-                        borderColor: '#4cc9f0',
-                        borderWidth: 1,
-                        borderRadius: 4,
-                    }]
+                    labels: labels,
+                    datasets: [{ label: label, data: values, backgroundColor: color + '90', borderColor: color, borderWidth: 1, borderRadius: 4 }]
                 },
                 options: {
                     responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, ticks: { callback: v => 'RM ' + v.toLocaleString() } } }
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'top',
+                            font: { size: 9, weight: 'bold' },
+                            formatter: formatVal,
+                            color: '#333'
+                        }
+                    },
+                    scales: { y: { beginAtZero: true, grace: '15%', ticks: { callback: formatVal } } }
                 }
             });
-        }, 100);
-
-        // Consultant ranking
-        const consDiv = document.getElementById('reportConsultants');
-        if (data.consultant_ranking.length === 0) {
-            consDiv.innerHTML = '<p class="text-muted small">暂无数据</p>';
-        } else {
-            const maxVal = data.consultant_ranking[0].total;
-            consDiv.innerHTML = data.consultant_ranking.map((c, i) => `
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between mb-1">
-                        <span><span class="badge bg-secondary me-2">${i+1}</span>${escapeHtml(c.name)}</span>
-                        <span class="fw-bold">${formatMoney(c.total)} (${c.count}单)</span>
-                    </div>
-                    <div class="progress" style="height:8px">
-                        <div class="progress-bar bg-info" role="progressbar"
-                             style="width:${(c.total / maxVal * 100).toFixed(1)}%"></div>
-                    </div>
-                </div>
-            `).join('');
         }
 
-        // Source chart
-        if (window._sourceChart) window._sourceChart.destroy();
-        setTimeout(() => {
-            const ctx2 = document.getElementById('sourceChart');
-            if (!ctx2) return;
-            window._sourceChart = new Chart(ctx2, {
-                type: 'doughnut',
+        // 1. 每日预约
+        makeBar('chartApptDaily',
+            data.daily_appointments.map(function(d) { return d.date; }),
+            data.daily_appointments.map(function(d) { return d.count; }),
+            '#4361ee', '预约数');
+
+        // 2. 每日成交金额
+        makeBar('chartRevDaily',
+            data.daily_revenue.map(function(d) { return d.date; }),
+            data.daily_revenue.map(function(d) { return d.amount; }),
+            '#10b981', '成交金额(RM)',
+            function(v) { return 'RM ' + v.toLocaleString(); });
+
+        // 3. 网咨人员预约数量 (horizontal bar)
+        var ctx3 = document.getElementById('chartInviterAppt');
+        if (ctx3 && data.inviter_appointments.length > 0) {
+            window._chartInviterAppt = new Chart(ctx3, {
+                type: 'bar',
                 data: {
-                    labels: data.source_analysis.map(s => s.name || '未知'),
-                    datasets: [{
-                        data: data.source_analysis.map(s => s.count),
-                        backgroundColor: ['#4cc9f0', '#f72585', '#7209b7', '#ff9e00', '#06d6a0'],
-                    }]
+                    labels: data.inviter_appointments.map(function(d) { return d.name; }),
+                    datasets: [{ label: '预约数', data: data.inviter_appointments.map(function(d) { return d.count; }),
+                        backgroundColor: '#f59e0b90', borderColor: '#f59e0b', borderWidth: 1, borderRadius: 4 }]
                 },
-                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: { anchor: 'end', align: 'right', font: { size: 10, weight: 'bold' }, color: '#333' }
+                    },
+                    scales: { x: { beginAtZero: true, grace: '15%' } }
+                }
             });
-        }, 100);
-
-        // Visit chart
-        if (window._visitChart) window._visitChart.destroy();
-        setTimeout(() => {
-            const ctx3 = document.getElementById('visitChart');
-            if (!ctx3) return;
-            window._visitChart = new Chart(ctx3, {
-                type: 'doughnut',
-                data: {
-                    labels: data.visit_analysis.map(s => s.name || '未知'),
-                    datasets: [{
-                        data: data.visit_analysis.map(s => s.count),
-                        backgroundColor: ['#06d6a0', '#118ab2', '#ffd166', '#ef476f', '#073b4c', '#f72585', '#7209b7'],
-                    }]
-                },
-                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
-            });
-        }, 100);
-
-    } catch (e) {
-        showToast('加载报表失败: ' + e.message, 'error');
-    }
-}
-
-// ===================== Import Page =====================
-
-function renderImport() {
-    const body = document.getElementById('pageBody');
-    body.innerHTML = `
-        <div class="row g-4">
-            <div class="col-12">
-                <div class="chart-container">
-                    <h6 class="fw-bold mb-3">📥 从 Excel 导入数据</h6>
-                    <p class="text-muted small">支持导入预约总表 或 接诊业绩表（.xlsx 格式）</p>
-
-                    <div class="mb-3">
-                        <label class="form-label">选择文件</label>
-                        <input class="form-control" type="file" id="importFile" accept=".xlsx">
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">表类型</label>
-                        <select class="form-select" id="importType">
-                            <option value="appointment">预约总表</option>
-                            <option value="performance">接诊业绩表</option>
-                        </select>
-                    </div>
-
-                    <button class="btn btn-primary" onclick="uploadAndPreview()">
-                        <i class="bi bi-eye"></i> 预览数据
-                    </button>
-                </div>
-            </div>
-
-            <div class="col-12" id="previewArea" style="display:none">
-                <div class="chart-container">
-                    <h6 class="fw-bold mb-3">👀 数据预览</h6>
-                    <div class="table-responsive" id="previewTable"></div>
-                    <div class="mt-3">
-                        <button class="btn btn-success" onclick="executeImport()">
-                            <i class="bi bi-upload"></i> 确认导入
-                        </button>
-                        <span class="text-muted small ms-2" id="importProgress"></span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12" id="resultArea" style="display:none">
-                <div class="chart-container">
-                    <h6 class="fw-bold mb-3" id="resultTitle">导入结果</h6>
-                    <div id="resultBody"></div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-let uploadedPath = '';
-let uploadedSheets = [];
-
-async function uploadAndPreview() {
-    const fileInput = document.getElementById('importFile');
-    if (!fileInput.files || !fileInput.files[0]) {
-        showToast('请选择文件', 'error');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', fileInput.files[0]);
-
-    try {
-        const uploadRes = await fetch('/api/import/upload', {method: 'POST', body: formData});
-        const uploadData = await uploadRes.json();
-        if (!uploadData.success) { showToast(uploadData.error, 'error'); return; }
-
-        uploadedPath = uploadData.path;
-        const previewRes = await fetch('/api/import/preview', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({path: uploadedPath})
-        });
-        const previewData = await previewRes.json();
-        if (!previewData.success) { showToast(previewData.error, 'error'); return; }
-
-        uploadedSheets = previewData.sheets;
-        document.getElementById('previewArea').style.display = 'block';
-        document.getElementById('resultArea').style.display = 'none';
-
-        const pt = document.getElementById('previewTable');
-        pt.innerHTML = `
-            <p class="text-muted small mb-2">文件: ${escapeHtml(uploadData.filename)} · Sheet: ${escapeHtml(previewData.current_sheet)} · 共 ${previewData.total_rows} 行</p>
-            <table class="table table-sm table-bordered">
-                ${previewData.preview.map((row, idx) => `
-                    <tr${idx === 0 ? ' class="table-primary"' : ''}>
-                        ${row.map(c => `<td class="small">${escapeHtml(c)}</td>`).join('')}
-                    </tr>
-                `).join('')}
-            </table>
-        `;
-        showToast('预览已加载，请检查数据是否正确');
-
-    } catch (e) {
-        showToast('预览失败: ' + e.message, 'error');
-    }
-}
-
-async function executeImport() {
-    if (!uploadedPath) { showToast('请先上传文件', 'error'); return; }
-
-    const type = document.getElementById('importType').value;
-    document.getElementById('importProgress').textContent = '导入中，请稍候...';
-
-    try {
-        const res = await fetch('/api/import/execute', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({path: uploadedPath, table_type: type})
-        });
-        const data = await res.json();
-
-        document.getElementById('resultArea').style.display = 'block';
-        document.getElementById('importProgress').textContent = '';
-
-        if (data.success) {
-            document.getElementById('resultTitle').textContent = '✅ 导入完成';
-            document.getElementById('resultBody').innerHTML = `
-                <p>成功导入 <strong>${data.imported}</strong> 条记录</p>
-                ${(data.errors || []).length > 0 ? `
-                    <p class="text-warning">${data.errors.length} 条导入出错：</p>
-                    <ul class="small text-danger">
-                        ${data.errors.slice(0, 10).map(e => `<li>${escapeHtml(e)}</li>`).join('')}
-                    </ul>
-                ` : '<p class="text-success">全部导入成功 🎉</p>'}
-            `;
-            showToast('导入完成！');
-        } else {
-            document.getElementById('resultTitle').textContent = '❌ 导入失败';
-            document.getElementById('resultBody').innerHTML = `<p class="text-danger">${escapeHtml(data.error)}</p>`;
         }
-    } catch (e) {
-        document.getElementById('importProgress').textContent = '';
-        showToast('导入失败: ' + e.message, 'error');
-    }
+
+        // 4. 网咨人员成交金额 (horizontal bar)
+        var ctx4 = document.getElementById('chartConsultantRev');
+        if (ctx4 && data.consultant_revenue.length > 0) {
+            window._chartConsultantRev = new Chart(ctx4, {
+                type: 'bar',
+                data: {
+                    labels: data.consultant_revenue.map(function(d) { return d.name + ' (' + d.count + '单)'; }),
+                    datasets: [{ label: '成交额(RM)', data: data.consultant_revenue.map(function(d) { return d.total; }),
+                        backgroundColor: '#8b5cf690', borderColor: '#8b5cf6', borderWidth: 1, borderRadius: 4 }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: {
+                            anchor: 'end', align: 'right', font: { size: 10, weight: 'bold' }, color: '#333',
+                            formatter: function(v) { return 'RM ' + v.toLocaleString(); }
+                        }
+                    },
+                    scales: { x: { beginAtZero: true, grace: '15%', ticks: { callback: function(v) { return 'RM '+v.toLocaleString(); } } } }
+                }
+            });
+        }
+
+        // 5. 每日收款金额
+        makeBar('chartCollection',
+            data.daily_collection.map(function(d) { return d.date; }),
+            data.daily_collection.map(function(d) { return d.amount; }),
+            '#ef4444', '收款金额(RM)',
+            function(v) { return 'RM ' + v.toLocaleString(); });
+
+    }).catch(function(e) {
+        document.getElementById('pageBody').innerHTML = '<div class="alert alert-danger">加载失败: ' + e.message + '</div>';
+    });
 }
 
 // ===================== Employee Management =====================
+
+const PERM_LABELS = [
+    {key: 'can_view_appointments', label: '📅 预约'},
+    {key: 'can_view_transactions', label: '💰 成交'},
+    {key: 'can_edit_patients', label: '👥 患者'},
+    {key: 'can_view_reports', label: '📊 报表'},
+    {key: 'can_view_performance', label: '🏆 业绩'},
+    {key: 'can_view_images', label: '📷 图片'},
+    {key: 'can_view_treatment_plans', label: '🦷 方案'},
+    {key: 'can_view_consultations', label: '📩 咨询'},
+];
+
+function countPerms(e) {
+    return PERM_LABELS.filter(p => e[p.key]).length;
+}
+
+function makePermTooltip(e) {
+    return PERM_LABELS.map(p => (e[p.key] ? '✅' : '❌') + ' ' + p.label).join('\n');
+}
 
 function renderEmployees() {
     const body = document.getElementById('pageBody');
@@ -1600,8 +1991,8 @@ function renderEmployees() {
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>用户名</th><th>显示名称</th><th>角色</th><th>状态</th>
-                            <th>预约可见</th><th>成交可见</th><th>编辑患者</th><th>操作</th>
+                            <th>用户名</th><th>显示名称</th><th>分类</th><th>角色</th><th>状态</th>
+                            <th>权限</th><th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="empTableBody">
@@ -1626,11 +2017,10 @@ async function loadEmployees() {
                 <tr>
                     <td><strong>${escapeHtml(e.username)}</strong></td>
                     <td>${escapeHtml(e.display_name) || '-'}</td>
+                    <td>${e.employee_type === 'online_consultant' ? '<span class="badge bg-warning text-dark">📞 网咨</span>' : '<span class="badge bg-info">🏥 门诊</span>'}</td>
                     <td><span class="badge bg-${e.role === 'admin' ? 'danger' : 'primary'}">${e.role === 'admin' ? '管理员' : '员工'}</span></td>
                     <td>${e.is_active ? '<span class="text-success">✅ 启用</span>' : '<span class="text-danger">⛔ 禁用</span>'}</td>
-                    <td>${e.can_view_appointments ? '✅' : '❌'}</td>
-                    <td>${e.can_view_transactions ? '✅' : '❌'}</td>
-                    <td>${e.can_edit_patients ? '✅' : '❌'}</td>
+                    <td><span class="badge bg-info" title="${makePermTooltip(e)}">${countPerms(e)}/8</span></td>
                     <td>
                         <button class="btn btn-outline-primary btn-sm py-0 me-1" onclick="openEmployeeModal(${e.id})"><i class="bi bi-pencil"></i></button>
                         <button class="btn btn-outline-danger btn-sm py-0" onclick="deleteEmployee(${e.id}, '${escapeHtml(e.username)}')"><i class="bi bi-trash"></i></button>
@@ -1670,7 +2060,14 @@ async function openEmployeeModal(id) {
                 <label class="form-label">显示名称</label>
                 <input class="form-control" id="eDisplayName" value="${empData ? escapeHtml(empData.display_name) : ''}">
             </div>
-            <div class="col-6">
+            <div class="col-3">
+                <label class="form-label">员工分类</label>
+                <select class="form-select" id="eEmployeeType">
+                    <option value="clinic_staff" ${!empData || empData.employee_type === 'clinic_staff' ? 'selected' : ''}>🏥 门诊人员</option>
+                    <option value="online_consultant" ${empData && empData.employee_type === 'online_consultant' ? 'selected' : ''}>📞 网咨人员</option>
+                </select>
+            </div>
+            <div class="col-3">
                 <label class="form-label">状态</label>
                 <select class="form-select" id="eStatus">
                     <option value="true" ${empData && empData.is_active ? 'selected' : ''}>启用</option>
@@ -1681,19 +2078,49 @@ async function openEmployeeModal(id) {
             <div class="col-4">
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="ePermAppt" ${!empData || empData.can_view_appointments ? 'checked' : ''}>
-                    <label class="form-check-label" for="ePermAppt">📅 预约可见</label>
+                    <label class="form-check-label" for="ePermAppt">📅 初诊/复诊预约</label>
                 </div>
             </div>
             <div class="col-4">
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="ePermTxn" ${!empData || empData.can_view_transactions ? 'checked' : ''}>
-                    <label class="form-check-label" for="ePermTxn">💰 成交可见</label>
+                    <label class="form-check-label" for="ePermTxn">💰 成交管理</label>
                 </div>
             </div>
             <div class="col-4">
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="ePermEdit" ${!empData || empData.can_edit_patients ? 'checked' : ''}>
-                    <label class="form-check-label" for="ePermEdit">📝 编辑患者</label>
+                    <label class="form-check-label" for="ePermEdit">👥 患者管理</label>
+                </div>
+            </div>
+            <div class="col-4 mt-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="ePermReports" ${!empData || empData.can_view_reports ? 'checked' : ''}>
+                    <label class="form-check-label" for="ePermReports">📊 数据报表</label>
+                </div>
+            </div>
+            <div class="col-4 mt-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="ePermPerf" ${!empData || empData.can_view_performance ? 'checked' : ''}>
+                    <label class="form-check-label" for="ePermPerf">🏆 业绩管理</label>
+                </div>
+            </div>
+            <div class="col-4 mt-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="ePermImages" ${!empData || empData.can_view_images ? 'checked' : ''}>
+                    <label class="form-check-label" for="ePermImages">📷 患者图片</label>
+                </div>
+            </div>
+            <div class="col-4 mt-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="ePermTP" ${!empData || empData.can_view_treatment_plans ? 'checked' : ''}>
+                    <label class="form-check-label" for="ePermTP">🦷 治疗方案</label>
+                </div>
+            </div>
+            <div class="col-4 mt-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="ePermCons" ${!empData || empData.can_view_consultations ? 'checked' : ''}>
+                    <label class="form-check-label" for="ePermCons">📩 咨询管理</label>
                 </div>
             </div>
         </div>
@@ -1707,10 +2134,16 @@ async function saveEmployeeForm() {
         username: document.getElementById('eUsername').value.trim(),
         password: document.getElementById('ePassword').value,
         display_name: document.getElementById('eDisplayName').value.trim(),
+        employee_type: document.getElementById('eEmployeeType').value,
         is_active: document.getElementById('eStatus').value === 'true',
         can_view_appointments: document.getElementById('ePermAppt').checked,
         can_view_transactions: document.getElementById('ePermTxn').checked,
         can_edit_patients: document.getElementById('ePermEdit').checked,
+        can_view_reports: document.getElementById('ePermReports').checked,
+        can_view_performance: document.getElementById('ePermPerf').checked,
+        can_view_images: document.getElementById('ePermImages').checked,
+        can_view_treatment_plans: document.getElementById('ePermTP').checked,
+        can_view_consultations: document.getElementById('ePermCons').checked,
     };
     
     if (!data.username) { showToast('请输入用户名', 'error'); return; }
@@ -1742,6 +2175,1162 @@ async function deleteEmployee(id, username) {
         const data = await res.json();
         if (data.success) { showToast('已删除'); loadEmployees(); }
     } catch (e) { showToast('删除失败', 'error'); }
+}
+
+// ===================== Patient Images Page =====================
+
+var INTRAORAL_TYPES = [
+    { key: '上颌颌面', label: '上颌颌面' },
+    { key: '左侧咬合', label: '左侧咬合' },
+    { key: '正面咬合', label: '正面咬合' },
+    { key: '右侧咬合', label: '右侧咬合' },
+    { key: '下颌颌面', label: '下颌颌面' },
+];
+
+var piPatientId = null;
+var piStage = '术前';
+
+function renderPatientImages() {
+    showPatientImageList();
+}
+
+function showPatientImageList() {
+    piPatientId = null;
+    window._piPage = 1;
+    var body = document.getElementById('pageBody');
+    body.innerHTML = '' +
+        '<div class="d-flex flex-wrap align-items-center gap-2 mb-3">' +
+        '<div class="input-group" style="max-width:300px">' +
+        '<input class="form-control form-control-sm" id="piSearchFilter" placeholder="搜索患者姓名/电话..." oninput="filterPatientImageList()">' +
+        '</div>' +
+        '<span class="text-muted small" id="piSummaryCount"></span>' +
+        '</div>' +
+        '<div class="chart-container p-0">' +
+        '<div class="table-responsive">' +
+        '<table class="table table-hover table-sm mb-0" id="piSummaryTable">' +
+        '<thead class="table-light"><tr>' +
+        '<th>患者</th><th>电话</th><th class="text-center">预约日期</th><th class="text-center">术前</th><th class="text-center">术后</th><th class="text-center">合计</th>' +
+        '</tr></thead>' +
+        '<tbody id="piSummaryBody"><tr><td colspan="6" class="text-center text-muted py-4">正在加载...</td></tr></tbody>' +
+        '</table></div>' +
+        '<div id="piPagination" class="d-flex justify-content-between align-items-center p-2 border-top"></div>' +
+        '</div>';
+
+    loadPatientImageSummary(1);
+}
+
+async function loadPatientImageSummary(page) {
+    try {
+        var search = (document.getElementById('piSearchFilter') || {}).value || '';
+        var url = '/api/patients/images-summary?page=' + page + '&per_page=20';
+        if (search.trim()) url += '&search=' + encodeURIComponent(search.trim());
+        var res = await fetch(url);
+        var data = await res.json();
+        window._piSummaryData = data.data;
+        window._piTotal = data.total;
+        window._piPage = data.page;
+        window._piPerPage = data.per_page;
+        renderPatientImageSummary(data);
+    } catch (e) {
+        document.getElementById('piSummaryBody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">加载失败: ' + e.message + '</td></tr>';
+    }
+}
+
+function renderPatientImageSummary(data) {
+    var list = data.data;
+    var total = data.total;
+    var page = data.page;
+    var perPage = data.per_page;
+    var totalPages = Math.ceil(total / perPage);
+    
+    var tbody = document.getElementById('piSummaryBody');
+    if (!tbody) return;
+    
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">暂无符合条件的患者</td></tr>';
+        document.getElementById('piSummaryCount').textContent = '';
+        document.getElementById('piPagination').innerHTML = '';
+        return;
+    }
+    
+    var preTotal = 0, postTotal = 0;
+    for (var i = 0; i < list.length; i++) {
+        preTotal += list[i].pre_count;
+        postTotal += list[i].post_count;
+    }
+    
+    var html = '';
+    for (var i = 0; i < list.length; i++) {
+        var p = list[i];
+        var apptDate = p.latest_appointment || '—';
+        html += '<tr class="pi-row" style="cursor:pointer" onclick="selectPatientFromList(' + p.id + ')">';
+        html += '<td><span class="fw-medium">' + escapeHtml(p.name) + '</span></td>';
+        html += '<td class="text-muted small">' + escapeHtml(p.phone) + '</td>';
+        html += '<td class="text-center text-muted small">' + apptDate + '</td>';
+        html += '<td class="text-center"><span class="badge bg-primary bg-opacity-10 text-primary">' + p.pre_count + '</span></td>';
+        html += '<td class="text-center"><span class="badge bg-success bg-opacity-10 text-success">' + p.post_count + '</span></td>';
+        html += '<td class="text-center fw-bold">' + (p.pre_count + p.post_count) + '</td>';
+        html += '</tr>';
+    }
+    tbody.innerHTML = html;
+    
+    document.getElementById('piSummaryCount').textContent = '共 ' + total + ' 位患者 | 本页术前 ' + preTotal + ' 张 · 术后 ' + postTotal + ' 张';
+    
+    // Pagination controls
+    var pag = document.getElementById('piPagination');
+    var pagHtml = '<span class="text-muted small">第 ' + page + '/' + totalPages + ' 页</span>';
+    pagHtml += '<div class="btn-group btn-group-sm">';
+    pagHtml += '<button class="btn btn-outline-secondary btn-sm" onclick="loadPatientImageSummary(' + (page - 1) + ')" ' + (page <= 1 ? 'disabled' : '') + '><i class="bi bi-chevron-left"></i> 上一页</button>';
+    pagHtml += '<button class="btn btn-outline-secondary btn-sm" onclick="loadPatientImageSummary(' + (page + 1) + ')" ' + (page >= totalPages ? 'disabled' : '') + '>下一页 <i class="bi bi-chevron-right"></i></button>';
+    pagHtml += '</div>';
+    pag.innerHTML = pagHtml;
+}
+
+function filterPatientImageList() {
+    var q = (document.getElementById('piSearchFilter').value || '').trim().toLowerCase();
+    if (!q) { loadPatientImageSummary(1); return; }
+    // Search: call API with search param if supported, or client-side filter on current page
+    loadPatientImageSummary(1);
+}
+
+function selectPatientFromList(pid) {
+    piPatientId = pid;
+    piStage = '术前';
+    
+    // Find patient name from summary data
+    var all = window._piSummaryData || [];
+    var patient = null;
+    for (var i = 0; i < all.length; i++) {
+        if (all[i].id === pid) { patient = all[i]; break; }
+    }
+    var name = patient ? patient.name : '患者#' + pid;
+    
+    var body = document.getElementById('pageBody');
+    body.innerHTML = '' +
+        '<div class="d-flex flex-wrap align-items-center gap-2 mb-3">' +
+        '<button class="btn btn-outline-secondary btn-sm" onclick="showPatientImageList()"><i class="bi bi-arrow-left"></i> 返回清单</button>' +
+        '<div class="btn-group btn-group-sm" id="piStageToggle">' +
+        '<button class="btn btn-outline-primary active" data-stage="术前">术前</button>' +
+        '<button class="btn btn-outline-success" data-stage="术后">术后</button>' +
+        '</div>' +
+        '<span class="fw-medium">' + escapeHtml(name) + '</span>' +
+        '</div>' +
+        '<div id="piImagesArea"></div>';
+
+    document.getElementById('piStageToggle').addEventListener('click', function(e) {
+        var btn = e.target.closest('button');
+        if (!btn) return;
+        piStage = btn.dataset.stage;
+        document.querySelectorAll('#piStageToggle .btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        loadPatientImages();
+    });
+    
+    loadPatientImages();
+}
+
+async function loadPatientImages() {
+    var area = document.getElementById('piImagesArea');
+    if (!piPatientId) return;
+
+    try {
+        var res = await fetch('/api/patients/' + piPatientId + '/images');
+        var data = await res.json();
+        var images = data.data.filter(function(img) { return img.stage === piStage; });
+
+        var panImages = images.filter(function(img) { return img.category === '全景片'; });
+
+        var intraoralImages = {};
+        INTRAORAL_TYPES.forEach(function(t) { intraoralImages[t.key] = []; });
+        intraoralImages['特写照'] = [];
+        images.filter(function(img) { return img.category === '口内照'; }).forEach(function(img) {
+            var key = img.sub_type || '特写照';
+            if (!intraoralImages[key]) intraoralImages[key] = [];
+            intraoralImages[key].push(img);
+        });
+
+        var html = '';
+        html += '<div class="chart-container mb-3"><h6 class="fw-bold mb-3"><i class="bi bi-image"></i> 全景片</h6>';
+        html += renderImageSlots('全景片', '', panImages);
+        html += '</div>';
+
+        html += '<div class="chart-container"><h6 class="fw-bold mb-3"><i class="bi bi-camera"></i> 口内照</h6>';
+        html += '<div class="row g-3 mb-3"><div class="col-4 mx-auto">' + renderImageCard('上颌颌面', intraoralImages['上颌颌面']) + '</div></div>';
+        html += '<div class="row g-3 mb-3"><div class="col-4">' + renderImageCard('左侧咬合', intraoralImages['左侧咬合']) + '</div><div class="col-4">' + renderImageCard('正面咬合', intraoralImages['正面咬合']) + '</div><div class="col-4">' + renderImageCard('右侧咬合', intraoralImages['右侧咬合']) + '</div></div>';
+        html += '<div class="row g-3 mb-3"><div class="col-4 mx-auto">' + renderImageCard('下颌颌面', intraoralImages['下颌颌面']) + '</div></div>';
+        html += '<div class="row g-3 mb-3">' + renderCloseupSlots(intraoralImages['特写照']) + '</div>';
+        html += '<button class="btn btn-outline-primary btn-sm" onclick="addCloseupSlot()"><i class="bi bi-plus-circle"></i> 增加特写及合影</button>';
+        html += '</div>';
+
+        area.innerHTML = html;
+    } catch (e) {
+        area.innerHTML = '<div class="alert alert-danger">加载失败: ' + e.message + '</div>';
+    }
+}
+
+function renderImageSlots(category, subType, images) {
+    var existing = images.length > 0 ? images : [null];
+    return existing.map(function(img) {
+        if (img) {
+            return '<div class="d-inline-block position-relative me-2 mb-2" style="width:160px">' +
+                '<a href="' + img.url + '" target="_blank"><img src="' + img.url + '" class="img-thumbnail" style="width:160px;height:120px;object-fit:cover"></a>' +
+                '<button class="btn btn-danger btn-sm position-absolute top-0 end-0 rounded-circle" style="width:22px;height:22px;padding:0;font-size:10px;line-height:20px" onclick="deleteImage(' + img.id + ')">&times;</button>' +
+                '<div class="small text-muted text-truncate" style="width:160px">' + escapeHtml(img.original_name) + '</div>' +
+                '<button class="btn btn-outline-secondary btn-sm mt-1 w-100" onclick="triggerUpload(\'' + category + '\',\'' + subType + '\')"><i class="bi bi-plus"></i></button>' +
+            '</div>';
+        }
+        return '<div class="d-inline-block me-2 mb-2"><div class="border rounded d-flex align-items-center justify-content-center bg-light" style="width:160px;height:120px;cursor:pointer" onclick="triggerUpload(\'' + category + '\',\'' + subType + '\')"><div class="text-center text-muted"><i class="bi bi-cloud-upload" style="font-size:1.5em"></i><div class="small">上传图片</div></div></div></div>';
+    }).join('');
+}
+
+function renderImageCard(label, images) {
+    var h = '<div class="border rounded p-2 text-center bg-light" style="min-height:180px"><div class="fw-bold small mb-2">' + label + '</div><div>';
+    if (images.length > 0) {
+        h += images.map(function(img) {
+            return '<div class="position-relative d-inline-block mb-1"><a href="' + img.url + '" target="_blank"><img src="' + img.url + '" class="img-thumbnail" style="width:100%;max-height:130px;object-fit:cover"></a><button class="btn btn-danger btn-sm position-absolute top-0 end-0 rounded-circle" style="width:18px;height:18px;padding:0;font-size:9px;line-height:16px" onclick="deleteImage(' + img.id + ')">&times;</button></div>';
+        }).join('');
+        h += '<button class="btn btn-outline-secondary btn-sm mt-1 w-100" onclick="triggerUpload(\'口内照\',\'' + label + '\')"><i class="bi bi-plus"></i></button>';
+    } else {
+        h += '<div class="border border-dashed rounded d-flex align-items-center justify-content-center bg-white" style="height:110px;cursor:pointer" onclick="triggerUpload(\'口内照\',\'' + label + '\')"><div class="text-center text-muted"><i class="bi bi-plus-circle" style="font-size:1.3em"></i><div class="small">点击上传</div></div></div>';
+    }
+    return h + '</div></div>';
+}
+
+function renderCloseupSlots(images) {
+    var total = Math.max(images.length, 3);
+    var h = '';
+    for (var i = 0; i < total; i++) {
+        var img = i < images.length ? images[i] : null;
+        h += '<div class="col-4"><div class="border rounded p-2 text-center bg-light" style="min-height:150px"><div class="fw-bold small mb-2">特写及合影 ' + (i+1) + '</div>';
+        if (img) {
+            h += '<div class="position-relative d-inline-block"><a href="' + img.url + '" target="_blank"><img src="' + img.url + '" class="img-thumbnail" style="width:100%;max-height:130px;object-fit:cover"></a><button class="btn btn-danger btn-sm position-absolute top-0 end-0 rounded-circle" style="width:18px;height:18px;padding:0;font-size:9px;line-height:16px" onclick="deleteImage(' + img.id + ')">&times;</button></div>';
+            h += '<button class="btn btn-outline-secondary btn-sm mt-1 w-100" onclick="triggerUpload(\'口内照\',\'特写照\')"><i class="bi bi-plus"></i></button>';
+        } else {
+            h += '<div class="border border-dashed rounded d-flex align-items-center justify-content-center bg-white" style="height:110px;cursor:pointer" onclick="triggerUpload(\'口内照\',\'特写照\')"><div class="text-center text-muted"><i class="bi bi-plus-circle" style="font-size:1.3em"></i><div class="small">点击上传</div></div></div>';
+        }
+        h += '</div></div>';
+    }
+    return h;
+}
+
+var piFileInput = null;
+var piUploadCategory = '';
+var piUploadSubType = '';
+
+function triggerUpload(category, subType) {
+    piUploadCategory = category;
+    piUploadSubType = subType;
+    if (!piFileInput) {
+        piFileInput = document.createElement('input');
+        piFileInput.type = 'file';
+        piFileInput.accept = 'image/*';
+        piFileInput.style.display = 'none';
+        document.body.appendChild(piFileInput);
+        piFileInput.addEventListener('change', handleImageUpload);
+    }
+    piFileInput.click();
+}
+
+async function handleImageUpload(e) {
+    var file = e.target.files[0];
+    if (!file || !piPatientId) return;
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('stage', piStage);
+    fd.append('category', piUploadCategory);
+    fd.append('sub_type', piUploadSubType);
+    try {
+        var res = await fetch('/api/patients/' + piPatientId + '/images', { method: 'POST', body: fd });
+        var d = await res.json();
+        if (d.success) { showToast('图片已上传'); loadPatientImages(); }
+        else { showToast(d.error || '上传失败', 'error'); }
+    } catch (e) { showToast('上传失败: ' + e.message, 'error'); }
+    piFileInput.value = '';
+}
+
+async function deleteImage(iid) {
+    if (!confirm('确认删除这张图片？')) return;
+    try {
+        var res = await fetch('/api/images/' + iid, { method: 'DELETE' });
+        var d = await res.json();
+        if (d.success) { showToast('已删除'); loadPatientImages(); }
+    } catch (e) { showToast('删除失败', 'error'); }
+}
+
+function addCloseupSlot() {
+    triggerUpload('口内照', '特写照');
+}
+
+// ===================== 治疗方案 =====================
+
+let tpSelectedPid = null;
+let tpSelectedName = '';
+
+// Parse tooth_mark JSON or return defaults
+function parseToothJson(str) {
+    try {
+        if (str && str.startsWith('{')) return JSON.parse(str);
+    } catch(e) {}
+    return { UR: '', UL: '', LL: '', LR: '' };
+}
+
+function renderToothCrossInput(markStr, itemId, section) {
+    const m = parseToothJson(markStr);
+    return `
+        <div class="tooth-cross" data-id="${itemId}">
+            <div class="tooth-cross-grid">
+                <div class="tc-cell tc-ur">
+                    <input class="form-control form-control-sm tc-input" value="${escapeHtml(m.UR)}" placeholder="">
+                </div>
+                <div class="tc-cell tc-ul">
+                    <input class="form-control form-control-sm tc-input" value="${escapeHtml(m.UL)}" placeholder="">
+                </div>
+                <div class="tc-cell tc-lr">
+                    <input class="form-control form-control-sm tc-input" value="${escapeHtml(m.LR)}" placeholder="">
+                </div>
+                <div class="tc-cell tc-ll">
+                    <input class="form-control form-control-sm tc-input" value="${escapeHtml(m.LL)}" placeholder="">
+                </div>
+            </div>
+        </div>`;
+}
+
+function collectToothCross(row) {
+    const inputs = row.querySelectorAll('.tc-input');
+    if (inputs.length === 4) {
+        return JSON.stringify({
+            UR: inputs[0].value.trim(),
+            UL: inputs[1].value.trim(),
+            LR: inputs[2].value.trim(),
+            LL: inputs[3].value.trim(),
+        });
+    }
+    return '';
+}
+
+function renderTreatmentPlans() {
+    const body = document.getElementById('pageBody');
+    body.innerHTML = `
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body py-2">
+                <div class="d-flex gap-2 align-items-center">
+                    <label class="form-label mb-0 text-nowrap small">选择患者：</label>
+                    <select class="form-select form-select-sm" id="tpPatientSelect" style="max-width:320px">
+                        <option value="">-- 请选择患者 --</option>
+                    </select>
+                    <span class="text-muted small" id="tpPatientInfo"></span>
+                </div>
+            </div>
+        </div>
+        <div id="tpContent" class="text-center py-5 text-muted">
+            <i class="bi bi-clipboard2-heart" style="font-size:3rem"></i>
+            <p class="mt-2">请先选择患者</p>
+        </div>
+    `;
+
+    // Load patient list for the dropdown
+    loadTpPatientList();
+    tpSelectedPid = null;
+    tpSelectedName = '';
+}
+
+async function loadTpPatientList() {
+    try {
+        // Load all patients
+        const res = await fetch('/api/patients?per_page=500');
+        const d = await res.json();
+        const sel = document.getElementById('tpPatientSelect');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">-- 请选择患者 --</option>' +
+            d.data.map(p => `<option value="${p.id}">${escapeHtml(p.name)} - ${escapeHtml(p.phone)} (${escapeHtml(p.internal_id)})</option>`).join('');
+
+        sel.addEventListener('change', function() {
+            const pid = this.value;
+            if (pid) {
+                const opt = this.options[this.selectedIndex];
+                tpSelectedPid = parseInt(pid);
+                tpSelectedName = opt.text;
+                loadTreatmentPlanEditor(tpSelectedPid);
+            } else {
+                tpSelectedPid = null;
+                document.getElementById('tpContent').innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-clipboard2-heart" style="font-size:3rem"></i><p class="mt-2">请先选择患者</p></div>';
+            }
+        });
+    } catch (e) {
+        console.error('Failed to load patient list:', e);
+    }
+}
+
+async function loadTreatmentPlanEditor(pid) {
+    const content = document.getElementById('tpContent');
+    content.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div> 加载中...</div>';
+
+    try {
+        const [detailRes, planRes] = await Promise.all([
+            fetch('/api/patients/' + pid),
+            fetch('/api/patients/' + pid + '/treatment-plans')
+        ]);
+        const detail = await detailRes.json();
+        const plans = await planRes.json();
+        const p = detail.patient;
+
+        // Group plans by section
+        const checkItems = (plans.data || []).filter(tp => tp.section === '检查');
+        const treatmentItems = (plans.data || []).filter(tp => tp.section === '治疗方案');
+
+        content.innerHTML = `
+            <div class="row g-3">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0 fw-bold" style="color:#198754"><i class="bi bi-search"></i> 检查</h6>
+                            <button class="btn btn-outline-success btn-sm" onclick="addTpItem('检查')"><i class="bi bi-plus"></i> 添加</button>
+                        </div>
+                        <div class="card-body" id="tpCheckList">
+                            ${renderTpItemList(checkItems, '检查')}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0 fw-bold" style="color:#0d6efd"><i class="bi bi-journal-medical"></i> 治疗方案</h6>
+                            <button class="btn btn-outline-primary btn-sm" onclick="addTpItem('治疗方案')"><i class="bi bi-plus"></i> 添加</button>
+                        </div>
+                        <div class="card-body" id="tpTreatmentList">
+                            ${renderTpItemList(treatmentItems, '治疗方案')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (e) {
+        content.innerHTML = '<div class="alert alert-danger">加载失败: ' + e.message + '</div>';
+    }
+}
+
+function renderTpItemList(items, section) {
+    if (!items || items.length === 0) {
+        return '<p class="text-muted small mb-0">暂无记录，点击"添加"按钮新增</p>';
+    }
+    return items.map((item, idx) => {
+        const costItems = item.cost_items || [];
+        const costTotal = item.cost_total || 0;
+        return `
+        <div data-id="${item.id}" style="border:1px solid #e0e0e0;border-radius:8px;padding:14px;margin-bottom:12px;background:#fff">
+            <div class="row g-2 align-items-start">
+                ${section === '治疗方案' ? `
+                <div class="col-auto">
+                    <label class="form-label small mb-1">批次</label>
+                    <select class="form-select form-select-sm tp-batch" style="width:90px">
+                        <option value="">-</option>
+                        ${['批次一','批次二','批次三','批次四','批次五'].map(b => `<option value="${b}" ${item.batch === b ? 'selected' : ''}>${b}</option>`).join('')}
+                    </select>
+                </div>
+                ` : ''}
+                <div class="col-auto">
+                    <label class="form-label small mb-1">牙位</label>
+                    ${renderToothCrossInput(item.tooth_mark, item.id)}
+                </div>
+                <div class="col">
+                    <label class="form-label small mb-1">备注</label>
+                    <input class="form-control form-control-sm tp-note" value="${escapeHtml(item.note)}"
+                           placeholder="检查/治疗方案备注" data-id="${item.id}">
+                </div>
+                <div class="col-auto d-flex gap-1 align-items-end" style="padding-bottom:2px">
+                    <button class="btn btn-outline-secondary btn-sm" style="padding:2px 6px;font-size:11px"
+                            onclick="saveTpItem(${item.id})" title="保存">💾</button>
+                    <button class="btn btn-outline-danger btn-sm" style="padding:2px 6px;font-size:11px"
+                            onclick="deleteTpItem(${item.id})" title="删除">🗑</button>
+                </div>
+            </div>
+            ${section === '治疗方案' ? renderCostItemSection(item.id, costItems, costTotal) : ''}
+        </div>`;
+    }).join('');
+}
+
+// ===================== 费用明细 =====================
+
+const COST_MAJOR_CATS = ['种植体', '牙冠', '基台', '骨粉', '骨膜', '内外提', '其他'];
+
+function renderCostItemSection(tid, costItems, costTotal) {
+    const items = costItems || [];
+    const total = costTotal || 0;
+    let html = `
+        <hr class="my-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-bold small" style="color:#e94560">💲 费用明细</span>
+            <button class="btn btn-outline-danger btn-sm py-0 px-2" onclick="addCostItem(${tid})" style="font-size:11px">
+                <i class="bi bi-plus"></i> 添加
+            </button>
+        </div>`;
+
+    if (items.length === 0) {
+        html += '<p class="text-muted small mb-1">暂无费用项</p>';
+    } else {
+        html += `
+        <div class="table-responsive">
+            <table class="table table-sm table-borderless mb-1" style="font-size:12px">
+                <thead style="background:#fff5f5">
+                    <tr>
+                        <th style="width:12%">大类</th>
+                        <th style="width:14%">小类</th>
+                        <th style="width:7%">数量</th>
+                        <th style="width:12%" class="text-end">单价</th>
+                        <th style="width:10%" class="text-end">折扣率</th>
+                        <th style="width:14%" class="text-end">总价</th>
+                        <th style="width:10%"></th>
+                    </tr>
+                </thead>
+                <tbody id="costTbody_${tid}">
+                    ${items.map(ci => renderCostItemRow(tid, ci)).join('')}
+                </tbody>
+                <tfoot>
+                    <tr style="border-top:2px solid #e94560;font-weight:700">
+                        <td colspan="5" class="text-end" style="color:#e94560">合计</td>
+                        <td class="text-end fw-bold" id="costTotal_${tid}">${formatMoney(total)}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>`;
+    }
+    return html;
+}
+
+function renderCostItemRow(tid, ci) {
+    const majorOptions = COST_MAJOR_CATS.map(c =>
+        `<option value="${c}" ${ci.major_category === c ? 'selected' : ''}>${c}</option>`
+    ).join('');
+    return `
+        <tr class="cost-item-row" data-cid="${ci.id}">
+            <td>
+                <select class="form-select form-select-sm ci-major" style="font-size:11px;padding:2px 4px">
+                    <option value="">-</option>
+                    ${majorOptions}
+                </select>
+            </td>
+            <td>
+                <input class="form-control form-control-sm ci-sub" style="font-size:11px;padding:2px 4px"
+                       value="${escapeHtml(ci.sub_category)}" placeholder="品牌/型号">
+            </td>
+            <td>
+                <input class="form-control form-control-sm ci-qty" type="number" min="1" style="font-size:11px;padding:2px 4px;width:55px"
+                       value="${ci.quantity || 1}" onchange="recalcCostRow(this)">
+            </td>
+            <td>
+                <input class="form-control form-control-sm ci-unit-price text-end" type="number" step="0.01" style="font-size:11px;padding:2px 4px"
+                       value="${ci.unit_price || 0}" onchange="recalcCostRow(this)">
+            </td>
+            <td>
+                <div class="input-group input-group-sm" style="font-size:11px">
+                    <input class="form-control form-control-sm ci-discount text-end" type="number" step="1" min="0" max="100" style="font-size:11px;padding:2px 4px"
+                           value="${ci.discount_rate || 0}" onchange="recalcCostRow(this)">
+                    <span class="input-group-text" style="font-size:10px;padding:2px 4px">%</span>
+                </div>
+            </td>
+            <td class="text-end fw-bold ci-total-cell">
+                ${formatMoney(ci.total_price || 0)}
+            </td>
+            <td>
+                <button class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="saveCostItem(${ci.id}, ${tid})" title="保存" style="font-size:10px">💾</button>
+                <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="deleteCostItem(${ci.id}, ${tid})" title="删除" style="font-size:10px">🗑</button>
+            </td>
+        </tr>`;
+}
+
+function recalcCostRow(el) {
+    const row = el.closest('tr');
+    if (!row) return;
+    const qty = parseInt(row.querySelector('.ci-qty').value) || 1;
+    const unitPrice = parseFloat(row.querySelector('.ci-unit-price').value) || 0;
+    const discount = parseFloat(row.querySelector('.ci-discount').value) || 0;
+    const total = unitPrice * qty * (1 - discount / 100);
+    row.querySelector('.ci-total-cell').textContent = formatMoney(total);
+}
+
+function collectCostItemData(row) {
+    return {
+        major_category: (row.querySelector('.ci-major') || {}).value || '',
+        sub_category: (row.querySelector('.ci-sub') || {}).value || '',
+        quantity: parseInt((row.querySelector('.ci-qty') || {}).value) || 1,
+        unit_price: parseFloat((row.querySelector('.ci-unit-price') || {}).value) || 0,
+        discount_rate: parseFloat((row.querySelector('.ci-discount') || {}).value) || 0,
+        total_price: parseFloat((row.querySelector('.ci-unit-price') || {}).value || 0)
+            * (parseInt((row.querySelector('.ci-qty') || {}).value) || 1)
+            * (1 - (parseFloat((row.querySelector('.ci-discount') || {}).value) || 0) / 100),
+    };
+}
+
+async function addCostItem(tid) {
+    try {
+        const res = await fetch('/api/treatment-plans/' + tid + '/cost-items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ major_category: '', sub_category: '', unit_price: 0, quantity: 1, discount_rate: 0, total_price: 0, sort_order: Date.now() })
+        });
+        const d = await res.json();
+        if (d.success) {
+            loadTreatmentPlanEditor(tpSelectedPid);
+            showToast('费用项已添加');
+        }
+    } catch (e) { showToast('添加失败', 'error'); }
+}
+
+async function saveCostItem(cid, tid) {
+    const row = document.querySelector('.cost-item-row[data-cid="' + cid + '"]');
+    if (!row) return;
+    const data = collectCostItemData(row);
+    try {
+        const res = await fetch('/api/cost-items/' + cid, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const d = await res.json();
+        if (d.success) {
+            showToast('已保存');
+            // Recalculate the total for this treatment plan
+            recalcCostSectionTotal(tid);
+        }
+    } catch (e) { showToast('保存失败', 'error'); }
+}
+
+async function deleteCostItem(cid, tid) {
+    if (!confirm('确认删除此费用项？')) return;
+    try {
+        const res = await fetch('/api/cost-items/' + cid, { method: 'DELETE' });
+        const d = await res.json();
+        if (d.success) {
+            loadTreatmentPlanEditor(tpSelectedPid);
+            showToast('已删除');
+        }
+    } catch (e) { showToast('删除失败', 'error'); }
+}
+
+function recalcCostSectionTotal(tid) {
+    const rows = document.querySelectorAll('#costTbody_' + tid + ' .cost-item-row');
+    let total = 0;
+    rows.forEach(row => {
+        const cellText = row.querySelector('.ci-total-cell').textContent.replace('RM ', '').replace(/,/g, '');
+        total += parseFloat(cellText) || 0;
+    });
+    const totalEl = document.getElementById('costTotal_' + tid);
+    if (totalEl) totalEl.textContent = formatMoney(total);
+}
+
+async function addTpItem(section) {
+    if (!tpSelectedPid) return;
+    try {
+        const res = await fetch('/api/patients/' + tpSelectedPid + '/treatment-plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ section: section, tooth_mark: '', note: '', sort_order: Date.now() })
+        });
+        const d = await res.json();
+        if (d.success) {
+            loadTreatmentPlanEditor(tpSelectedPid);
+        }
+    } catch (e) { showToast('添加失败', 'error'); }
+}
+
+async function saveTpItem(id) {
+    const row = document.querySelector('[data-id="' + id + '"]');
+    if (!row) return;
+    const batchEl = row.querySelector('.tp-batch');
+    const batch = batchEl ? batchEl.value : '';
+    const tooth = collectToothCross(row);
+    const note = row.querySelector('.tp-note').value;
+    try {
+        const res = await fetch('/api/treatment-plans/' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ batch: batch, tooth_mark: tooth, note: note })
+        });
+        const d = await res.json();
+        if (d.success) {
+            showToast('已保存');
+        }
+    } catch (e) { showToast('保存失败', 'error'); }
+}
+
+async function deleteTpItem(id) {
+    if (!confirm('确认删除此记录？')) return;
+    try {
+        const res = await fetch('/api/treatment-plans/' + id, { method: 'DELETE' });
+        const d = await res.json();
+        if (d.success) {
+            loadTreatmentPlanEditor(tpSelectedPid);
+            showToast('已删除');
+        }
+    } catch (e) { showToast('删除失败', 'error'); }
+}
+
+// ===================== 业绩管理 =====================
+
+function renderPerformance() {
+    const now = new Date();
+    const body = document.getElementById('pageBody');
+    body.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex gap-2 align-items-center">
+                <select class="form-select form-select-sm" id="perfYear" style="width:90px">
+                    ${[2024,2025,2026,2027,2028].map(y => `<option value="${y}" ${y === now.getFullYear() ? 'selected' : ''}>${y}年</option>`).join('')}
+                </select>
+                <select class="form-select form-select-sm" id="perfMonth" style="width:80px">
+                    ${Array.from({length:12}, (_,i) => `<option value="${i+1}" ${i+1 === now.getMonth()+1 ? 'selected' : ''}>${i+1}月</option>`).join('')}
+                </select>
+                <button class="btn btn-outline-primary btn-sm" onclick="loadPerformance()">查询</button>
+            </div>
+        </div>
+        <div id="perfContent" class="text-center py-5 text-muted">
+            <i class="bi bi-trophy" style="font-size:3rem"></i>
+            <p class="mt-2">点击"查询"查看业绩</p>
+        </div>
+    `;
+}
+
+async function loadPerformance() {
+    const year = document.getElementById('perfYear').value;
+    const month = document.getElementById('perfMonth').value;
+    const content = document.getElementById('perfContent');
+    content.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div> 加载中...</div>';
+
+    try {
+        const res = await fetch('/api/performance?year=' + year + '&month=' + month);
+        const d = await res.json();
+        const fm = formatMoney;
+
+        content.innerHTML = `
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom py-2">
+                            <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-headset"></i> 网咨人员业绩</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light"><tr><th>网咨</th><th class="text-end">成交数</th><th class="text-end">业绩金额</th></tr></thead>
+                                    <tbody>
+                                        ${d.online_consultants.length === 0 ? '<tr><td colspan="3" class="text-center text-muted py-3">暂无数据</td></tr>' :
+                                        d.online_consultants.map(r => `<tr><td>${escapeHtml(r.name)}</td><td class="text-end">${r.count}</td><td class="text-end fw-bold text-success">${fm(r.total)}</td></tr>`).join('')}
+                                        ${d.online_consultants.length > 0 ? `<tr class="table-primary fw-bold"><td>合计</td><td class="text-end">-</td><td class="text-end">${fm(d.total_online)}</td></tr>` : ''}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom py-2">
+                            <h6 class="mb-0 fw-bold text-success"><i class="bi bi-person-check"></i> 咨询师业绩</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light"><tr><th>咨询师</th><th class="text-end">成交数</th><th class="text-end">业绩金额</th></tr></thead>
+                                    <tbody>
+                                        ${d.consultants.length === 0 ? '<tr><td colspan="3" class="text-center text-muted py-3">暂无数据</td></tr>' :
+                                        d.consultants.map(r => `<tr><td>${escapeHtml(r.name)}</td><td class="text-end">${r.count}</td><td class="text-end fw-bold text-success">${fm(r.total)}</td></tr>`).join('')}
+                                        ${d.consultants.length > 0 ? `<tr class="table-primary fw-bold"><td>合计</td><td class="text-end">-</td><td class="text-end">${fm(d.total_consultant)}</td></tr>` : ''}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (e) {
+        content.innerHTML = '<div class="alert alert-danger">加载失败: ' + e.message + '</div>';
+    }
+}
+
+// ===================== 咨询管理 =====================
+
+async function renderConsultations() {
+    const body = document.getElementById('pageBody');
+    body.innerHTML = `
+        <!-- 筛选栏 -->
+        <div class="card mb-3">
+            <div class="card-body py-2">
+                <div class="row g-2 align-items-center">
+                    <div class="col-auto">
+                        <input type="text" class="form-control form-control-sm" id="consSearch" placeholder="搜索姓名/电话/广告编码/网咨..." style="width:260px">
+                    </div>
+                    <div class="col-auto">
+                        <input type="month" class="form-control form-control-sm" id="consMonth">
+                    </div>
+                    <div class="col-auto">
+                        <select class="form-select form-select-sm" id="consApptFilter" style="width:130px">
+                            <option value="">全部状态</option>
+                            <option value="是">已预约</option>
+                            <option value="否">未预约</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-sm btn-primary" onclick="renderConsultations()">
+                            <i class="bi bi-search"></i> 搜索
+                        </button>
+                    </div>
+                    <div class="col-auto ms-auto">
+                        <button class="btn btn-sm btn-success" onclick="showConsultationForm()">
+                            <i class="bi bi-plus-lg"></i> 新增咨询
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="row g-2 mb-3" id="consStats"></div>
+
+        <!-- 列表 -->
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:100px">日期</th>
+                                <th>患者姓名</th>
+                                <th>电话</th>
+                                <th>广告编码</th>
+                                <th>网咨人员</th>
+                                <th style="width:80px">已回复</th>
+                                <th style="width:80px">已预约</th>
+                                <th style="width:100px">预约日期</th>
+                                <th style="width:100px">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="consTableBody">
+                            <tr><td colspan="9" class="text-center py-4 text-muted">
+                                <div class="spinner-border spinner-border-sm" role="status"></div> 加载中...
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分页 -->
+        <div class="d-flex justify-content-between align-items-center mt-3" id="consPagination"></div>
+    `;
+
+    loadConsultations();
+
+    // 搜索回车
+    document.getElementById('consSearch').addEventListener('keydown', e => { if (e.key === 'Enter') loadConsultations(); });
+    document.getElementById('consMonth').addEventListener('change', () => loadConsultations());
+    document.getElementById('consApptFilter').addEventListener('change', () => loadConsultations());
+}
+
+async function loadConsultations(page = 1) {
+    const search = document.getElementById('consSearch')?.value || '';
+    const month = document.getElementById('consMonth')?.value || '';
+    const hasAppt = document.getElementById('consApptFilter')?.value || '';
+
+    try {
+        const params = new URLSearchParams({ page, per_page: 20, search, month });
+        if (hasAppt) params.set('has_appointment', hasAppt);
+
+        const res = await fetch('/api/consultations?' + params);
+        const data = await res.json();
+
+        // 统计
+        const total = data.data || [];
+        const hasReply = total.filter(c => c.has_reply === '是').length;
+        const hasApptCount = total.filter(c => c.has_appointment === '是').length;
+        const pending = total.length - hasApptCount;
+
+        const stats = document.getElementById('consStats');
+        if (stats) {
+            const scope = (month ? '本月' : (search ? '筛选' : '全部'));
+            stats.innerHTML = `
+                <div class="col-6 col-md-3">
+                    <div class="stat-card"><div class="value">${data.total}</div><div class="label">${scope}咨询</div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="stat-card"><div class="value">${hasReply}</div><div class="label">已回复</div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="stat-card"><div class="value">${hasApptCount}</div><div class="label">已预约</div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="stat-card"><div class="value">${pending}</div><div class="label">未预约</div></div>
+                </div>
+            `;
+        }
+
+        // 表格
+        const tbody = document.getElementById('consTableBody');
+        if (total.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">暂无数据</td></tr>';
+        } else {
+            tbody.innerHTML = total.map(c => `
+                <tr>
+                    <td class="small">${c.date || '-'}</td>
+                    <td><strong>${escapeHtml(c.patient_name) || '-'}</strong></td>
+                    <td class="small">${escapeHtml(c.patient_phone) || '-'}</td>
+                    <td><code class="small">${escapeHtml(c.ad_code) || '-'}</code></td>
+                    <td>${escapeHtml(c.consultant) || '-'}</td>
+                    <td><span class="badge ${c.has_reply === '是' ? 'bg-success' : 'bg-secondary'}">${c.has_reply}</span></td>
+                    <td><span class="badge ${c.has_appointment === '是' ? 'bg-primary' : 'bg-warning text-dark'}">${c.has_appointment}</span></td>
+                    <td class="small">${c.appointment_date || '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editConsultation(${c.id})" title="编辑">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteConsultation(${c.id})" title="删除">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 分页
+        const pag = document.getElementById('consPagination');
+        if (data.pages > 1) {
+            let phtml = '<div class="text-muted small">共 ' + data.total + ' 条</div>';
+            phtml += '<nav><ul class="pagination pagination-sm mb-0">';
+            for (let i = 1; i <= data.pages; i++) {
+                phtml += `<li class="page-item ${i === page ? 'active' : ''}"><a class="page-link" href="#" onclick="loadConsultations(${i})">${i}</a></li>`;
+            }
+            phtml += '</ul></nav>';
+            pag.innerHTML = phtml;
+        } else {
+            pag.innerHTML = '<div class="text-muted small">共 ' + data.total + ' 条</div>';
+        }
+    } catch (e) {
+        document.getElementById('consTableBody').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">加载失败: ' + e.message + '</td></tr>';
+    }
+}
+
+function showConsultationForm(cid = null) {
+    const isEdit = cid !== null;
+    const modal = document.getElementById('formModal');
+    const label = document.getElementById('formModalLabel');
+    const body = document.getElementById('formBody');
+
+    label.textContent = isEdit ? '编辑咨询' : '新增咨询';
+    body.innerHTML = `
+        <input type="hidden" id="formType" value="consultation">
+        <input type="hidden" id="consId" value="${isEdit ? cid : ''}">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">咨询日期 *</label>
+                <input type="text" class="form-control datetime-picker" id="consDate" placeholder="选择日期">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">广告编码 *</label>
+                <input type="text" class="form-control" id="consAdCode" placeholder="如 FB-2024-SUMMER">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">患者姓名 *</label>
+                <input type="text" class="form-control" id="consPatientName" placeholder="患者姓名">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">患者电话 *</label>
+                <input type="text" class="form-control" id="consPatientPhone" placeholder="电话号码">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">网咨人员</label>
+                <input type="text" class="form-control" id="consConsultant" placeholder="网咨人员姓名">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">是否有回复</label>
+                <select class="form-select" id="consHasReply">
+                    <option value="否">否</option>
+                    <option value="是">是</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">是否预约</label>
+                <select class="form-select" id="consHasAppointment" onchange="toggleConsultAppointmentFields()">
+                    <option value="否">否</option>
+                    <option value="是">是</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 预约详情区（选"是"时显示） -->
+        <div class="mt-3 p-3 bg-light rounded" id="consApptSection" style="display:none">
+            <h6 class="fw-bold"><i class="bi bi-calendar-check"></i> 预约信息</h6>
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <label class="form-label small">预约日期</label>
+                    <input type="text" class="form-control form-control-sm datetime-picker" id="consApptDate" placeholder="选择日期">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">预约时间</label>
+                    ${timePickerHtml('cons', '')}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">预约成功时间</label>
+                    <input type="text" class="form-control form-control-sm datetime-picker" id="consApptSuccessTime" placeholder="自动填充">
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Override saveForm for consultation
+    window._saveConsultationForm = async function() {
+        const id = document.getElementById('consId').value;
+        const hasAppt = document.getElementById('consHasAppointment').value;
+        
+        const payload = {
+            date: document.getElementById('consDate').value,
+            patient_name: document.getElementById('consPatientName').value.trim(),
+            patient_phone: document.getElementById('consPatientPhone').value.trim(),
+            ad_code: document.getElementById('consAdCode').value.trim(),
+            has_reply: document.getElementById('consHasReply').value,
+            has_appointment: hasAppt,
+            consultant: document.getElementById('consConsultant').value.trim(),
+        };
+
+        if (hasAppt === '是') {
+            payload.appointment_date = document.getElementById('consApptDate').value;
+            payload.appointment_time = getTimePickerValue('cons');
+            payload.appointment_success_time = document.getElementById('consApptSuccessTime').value;
+        }
+
+        // Validate
+        if (!payload.date) { showToast('请选择咨询日期', 'error'); return; }
+        if (!payload.patient_name) { showToast('请输入患者姓名', 'error'); return; }
+        if (!payload.patient_phone) { showToast('请输入患者电话', 'error'); return; }
+        if (hasAppt === '是') {
+            if (!payload.appointment_date) { showToast('请选择预约日期', 'error'); return; }
+        }
+
+        try {
+            const url = id ? '/api/consultations/' + id : '/api/consultations';
+            const method = id ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('formModal')).hide();
+                const msg = hasAppt === '是' ? '咨询已录入，预约已自动推送到初诊预约' : '咨询已录入';
+                showToast(msg, 'success');
+                renderConsultations();
+            } else {
+                showToast(data.error || '保存失败', 'error');
+            }
+        } catch (e) {
+            showToast('网络错误', 'error');
+        }
+    };
+
+    // Bind save button
+    document.querySelector('#formModal .btn-primary').onclick = window._saveConsultationForm;
+
+    // 如果是编辑，填充数据
+    if (isEdit) {
+        fetch('/api/consultations/' + cid)
+            .then(r => r.json())
+            .then(d => {
+                const c = d.data;
+                document.getElementById('consDate').value = c.date || '';
+                document.getElementById('consAdCode').value = c.ad_code || '';
+                document.getElementById('consPatientName').value = c.patient_name || '';
+                document.getElementById('consPatientPhone').value = c.patient_phone || '';
+                document.getElementById('consConsultant').value = c.consultant || '';
+                document.getElementById('consHasReply').value = c.has_reply || '否';
+                document.getElementById('consHasAppointment').value = c.has_appointment || '否';
+                if (c.has_appointment === '是') {
+                    document.getElementById('consApptDate').value = c.appointment_date || '';
+                    document.getElementById('consApptSuccessTime').value = c.appointment_success_time || '';
+                    // 设置预约时间
+                    const match = (c.appointment_time || '').match(/(\d+):(\d+)\s*(AM|PM)/i);
+                    if (match) {
+                        const hEl = document.getElementById('cons_hour');
+                        const mEl = document.getElementById('cons_min');
+                        const aEl = document.getElementById('cons_ampm');
+                        if (hEl) hEl.value = match[1];
+                        if (mEl) mEl.value = match[2];
+                        if (aEl) aEl.value = match[3].toUpperCase();
+                    }
+                }
+                toggleConsultAppointmentFields();
+                flatpickr('.datetime-picker', { locale: 'zh', dateFormat: 'Y-m-d' });
+                const se = document.getElementById('consApptSuccessTime');
+                if (se) flatpickr(se, { locale: 'zh', enableTime: true, dateFormat: 'Y-m-d H:i' });
+            });
+    } else {
+        // Initialize date pickers for new
+        flatpickr('.datetime-picker', { locale: 'zh', dateFormat: 'Y-m-d' });
+        const se = document.getElementById('consApptSuccessTime');
+        if (se) flatpickr(se, { locale: 'zh', enableTime: true, dateFormat: 'Y-m-d H:i' });
+
+        // Auto-fill: today's date and current user as consultant
+        const today = new Date().toISOString().slice(0, 10);
+        document.getElementById('consDate').value = today;
+        const displayName = window.__displayName || '';
+        if (displayName && displayName !== 'admin') {
+            document.getElementById('consConsultant').value = displayName;
+        }
+    }
+
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+}
+
+// Reset save button when modal closes (prevent consultation hijacking)
+document.getElementById('formModal').addEventListener('hidden.bs.modal', function() {
+    var btn = this.querySelector('.btn-primary');
+    if (btn) btn.onclick = null;
+});
+
+function toggleConsultAppointmentFields() {
+    const sect = document.getElementById('consApptSection');
+    const sel = document.getElementById('consHasAppointment');
+    if (sel && sect) {
+        sect.style.display = sel.value === '是' ? '' : 'none';
+    }
+}
+
+async function editConsultation(cid) {
+    showConsultationForm(cid);
+}
+
+async function deleteConsultation(cid) {
+    if (!confirm('确定删除这条咨询记录吗？')) return;
+    try {
+        const res = await fetch('/api/consultations/' + cid, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+            showToast('已删除', 'success');
+            renderConsultations();
+        } else {
+            showToast('删除失败', 'error');
+        }
+    } catch (e) {
+        showToast('网络错误', 'error');
+    }
+}
+
+// ===================== Quick Upload from Patient Detail =====================
+
+function goToPatientImages(pid) {
+    bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
+    navigateTo('patient-images');
+    // First load the summary, then auto-select the patient
+    setTimeout(function() {
+        var check = setInterval(function() {
+            if (window._piSummaryData && window._piSummaryData.length > 0) {
+                clearInterval(check);
+                selectPatientFromList(pid);
+            }
+        }, 100);
+        // Timeout after 3s
+        setTimeout(function() { clearInterval(check); }, 3000);
+    }, 200);
 }
 
 </script>

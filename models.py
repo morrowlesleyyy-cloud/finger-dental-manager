@@ -79,6 +79,13 @@ class Appointment(db.Model):
     has_continue = db.Column(db.String(50))  # 是否有续种
 
     registered_date = db.Column(db.Date)     # 登记日期
+
+    # 复诊字段
+    doctor = db.Column(db.String(100))           # 医生
+    treatment_project = db.Column(db.String(200)) # 治疗项目
+    total_fee = db.Column(db.Float, default=0)    # 总费用
+    paid_fee = db.Column(db.Float, default=0)     # 已交费用
+
     created_at = db.Column(db.DateTime, default=datetime.now)
 
     def to_dict(self):
@@ -108,6 +115,11 @@ class Appointment(db.Model):
             'invalid_reason': self.invalid_reason or '',
             'has_continue': self.has_continue or '',
             'registered_date': self.registered_date.strftime('%Y-%m-%d') if self.registered_date else '',
+            'doctor': self.doctor or '',
+            'treatment_project': self.treatment_project or '',
+            'total_fee': self.total_fee or 0,
+            'paid_fee': self.paid_fee or 0,
+            'balance': (self.total_fee or 0) - (self.paid_fee or 0),
             'created_at': self.created_at.strftime('%Y-%m-%d') if self.created_at else '',
         }
 
@@ -121,11 +133,17 @@ class Employee(db.Model):
     password = db.Column(db.String(200), nullable=False)
     display_name = db.Column(db.String(50), default='')
     role = db.Column(db.String(20), default='staff')  # admin / staff
+    employee_type = db.Column(db.String(30), default='clinic_staff')  # online_consultant / clinic_staff
 
     # Permissions
     can_view_appointments = db.Column(db.Boolean, default=True)
     can_view_transactions = db.Column(db.Boolean, default=True)
     can_edit_patients = db.Column(db.Boolean, default=True)
+    can_view_reports = db.Column(db.Boolean, default=True)
+    can_view_performance = db.Column(db.Boolean, default=True)
+    can_view_images = db.Column(db.Boolean, default=True)
+    can_view_treatment_plans = db.Column(db.Boolean, default=True)
+    can_view_consultations = db.Column(db.Boolean, default=True)
 
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
@@ -137,9 +155,15 @@ class Employee(db.Model):
             'username': self.username,
             'display_name': self.display_name or '',
             'role': self.role,
+            'employee_type': self.employee_type or 'clinic_staff',
             'can_view_appointments': bool(self.can_view_appointments),
             'can_view_transactions': bool(self.can_view_transactions),
             'can_edit_patients': bool(self.can_edit_patients),
+            'can_view_reports': bool(self.can_view_reports),
+            'can_view_performance': bool(self.can_view_performance),
+            'can_view_images': bool(self.can_view_images),
+            'can_view_treatment_plans': bool(self.can_view_treatment_plans),
+            'can_view_consultations': bool(self.can_view_consultations),
             'is_active': bool(self.is_active),
             'created_at': self.created_at.strftime('%Y-%m-%d') if self.created_at else '',
         }
@@ -228,4 +252,135 @@ class Transaction(db.Model):
             'visit_outcome': self.visit_outcome or '',
             'consultant': self.consultant or '',
             'created_at': self.created_at.strftime('%Y-%m-%d') if self.created_at else '',
+        }
+
+
+class TreatmentPlan(db.Model):
+    """治疗方案 - 检查 + 治疗计划"""
+    __tablename__ = 'treatment_plans'
+
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'), nullable=False)
+    section = db.Column(db.String(20), nullable=False, default='检查')  # 检查 / 治疗方案
+    batch = db.Column(db.String(20))          # 批次: 批次一 ~ 批次五
+    tooth_mark = db.Column(db.String(200))   # 牙科十字标记 (JSON)
+    note = db.Column(db.Text)               # 备注
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    patient = db.relationship('Patient', backref=db.backref('treatment_plans', lazy='dynamic', cascade='all, delete-orphan'))
+
+    def to_dict(self):
+        cost_items_list = [ci.to_dict() for ci in self.cost_items.order_by(CostItem.sort_order).all()]
+        cost_total = sum(ci['total_price'] for ci in cost_items_list)
+        return {
+            'id': self.id,
+            'patient_id': self.patient_id,
+            'section': self.section,
+            'batch': self.batch or '',
+            'tooth_mark': self.tooth_mark or '',
+            'note': self.note or '',
+            'sort_order': self.sort_order,
+            'cost_items': cost_items_list,
+            'cost_total': cost_total,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else '',
+        }
+
+
+class CostItem(db.Model):
+    """费用明细 - 关联治疗方案的具体费用项"""
+    __tablename__ = 'cost_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    treatment_plan_id = db.Column(db.Integer, db.ForeignKey('treatment_plans.id', ondelete='CASCADE'), nullable=False)
+    major_category = db.Column(db.String(100), default='')   # 大类: 种植体/牙冠/骨粉/骨膜/内外提/其他
+    sub_category = db.Column(db.String(100), default='')      # 小类: 品牌型号/具体项目
+    unit_price = db.Column(db.Float, default=0)               # 单价
+    quantity = db.Column(db.Integer, default=1)               # 数量
+    discount_rate = db.Column(db.Float, default=0)            # 折扣率 (%)
+    total_price = db.Column(db.Float, default=0)              # 总价
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    treatment_plan = db.relationship('TreatmentPlan', backref=db.backref('cost_items', lazy='dynamic', cascade='all, delete-orphan'))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'treatment_plan_id': self.treatment_plan_id,
+            'major_category': self.major_category or '',
+            'sub_category': self.sub_category or '',
+            'unit_price': self.unit_price or 0,
+            'quantity': self.quantity or 1,
+            'discount_rate': self.discount_rate or 0,
+            'total_price': self.total_price or 0,
+            'sort_order': self.sort_order,
+        }
+
+
+class PatientImage(db.Model):
+    """患者图片 - 术前术后对比照"""
+    __tablename__ = 'patient_images'
+
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'), nullable=False)
+    stage = db.Column(db.String(20), nullable=False)      # 术前 / 术后
+    category = db.Column(db.String(20), nullable=False)    # 口内照 / 全景片
+    sub_type = db.Column(db.String(50))                    # 上颌颌面 / 左侧咬合 / 正面咬合 / 右侧咬合 / 下颌颌面 / 特写照
+    filename = db.Column(db.String(255), nullable=False)   # 服务器存储文件名
+    original_name = db.Column(db.String(255))              # 原始文件名
+    position = db.Column(db.Integer, default=0)            # 同位置多张排序
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    patient = db.relationship('Patient', backref=db.backref('images', lazy='dynamic', cascade='all, delete-orphan'))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'patient_id': self.patient_id,
+            'stage': self.stage,
+            'category': self.category,
+            'sub_type': self.sub_type or '',
+            'filename': self.filename,
+            'original_name': self.original_name or '',
+            'position': self.position,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else '',
+            'url': f'/api/images/{self.filename}',
+        }
+
+
+class Consultation(db.Model):
+    """咨询管理 - 广告进来的客户咨询"""
+    __tablename__ = 'consultations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, index=True)                    # 咨询日期
+    patient_name = db.Column(db.String(100))                 # 患者姓名
+    patient_phone = db.Column(db.String(50))                 # 患者电话
+    ad_code = db.Column(db.String(100))                      # 广告编码
+    has_reply = db.Column(db.String(10), default='否')       # 是否有回复: 是/否
+    has_appointment = db.Column(db.String(10), default='否') # 是否预约: 是/否
+    appointment_success_time = db.Column(db.DateTime)        # 预约成功的时间
+    appointment_date = db.Column(db.Date)                    # 预约日期
+    appointment_time = db.Column(db.String(50))              # 预约时间
+    consultant = db.Column(db.String(50))                    # 网咨人员
+    appointment_id = db.Column(db.Integer)                   # 关联的预约ID
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'date': self.date.strftime('%Y-%m-%d') if self.date else '',
+            'patient_name': self.patient_name or '',
+            'patient_phone': self.patient_phone or '',
+            'ad_code': self.ad_code or '',
+            'has_reply': self.has_reply or '否',
+            'has_appointment': self.has_appointment or '否',
+            'appointment_success_time': self.appointment_success_time.strftime('%Y-%m-%d %H:%M') if self.appointment_success_time else '',
+            'appointment_date': self.appointment_date.strftime('%Y-%m-%d') if self.appointment_date else '',
+            'appointment_time': self.appointment_time or '',
+            'consultant': self.consultant or '',
+            'appointment_id': self.appointment_id or 0,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else '',
         }
